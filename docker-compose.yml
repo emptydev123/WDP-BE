@@ -1,0 +1,27 @@
+version: "3.9"
+services:
+  api:
+    build: .
+    container_name: vehicle-be
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      # Redis connection defaults (can be overridden via .env)
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_DB=0
+    ports:
+      - "3000:3000"
+    depends_on:
+      - redis
+  redis:
+    image: redis:7-alpine
+    container_name: cache
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+volumes:
+  redis-data:

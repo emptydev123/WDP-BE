@@ -6,7 +6,10 @@ var cookieParser = require('cookie-parser');
 var logger = require('morgan');
 const dbConnect = require('./DB/db')
 const routes = require('./router')
+const { connectRedis } = require('./services/redis')
 var app = express();
+// Initialize Redis (non-blocking)
+connectRedis().catch(err => console.error('Redis init failed:', err));
 var cors = require('cors');
 const admin = require('./firebase/firebase')
 const swaggerDocs = require('./swagger/config');
