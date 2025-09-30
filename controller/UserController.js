@@ -3,9 +3,10 @@ var User = require("../model/user");
 var bryctjs = require("bcryptjs");
 var jwt = require("jsonwebtoken");
 var admin = require("../firebase/firebase");
-
-// THÊM IMPORT REDIS
+const nodemailer = require('nodemailer');
+const { v4: uuidv4 } = require('uuid');
 const { cacheGet, cacheSet, cacheDel } = require("../services/redis");
+const crypto = require('crypto');
 
 exports.registerUser = async (req, res) => {
   try {
@@ -53,7 +54,8 @@ exports.registerUser = async (req, res) => {
 };
 
 exports.login = async (req, res) => {
-  const secretKey = process.env.SECRET_KEY || process.env.JWT_SECRET;
+  const secretKey = process.env.SECRET_KEY;
+  const refreshKey = process.env.REFRESH_KEY;
   const { username, password } = req.body;
   try {
     const user = await User.findOne({ username });
@@ -75,7 +77,12 @@ exports.login = async (req, res) => {
       secretKey,
       { expiresIn: "1h" }
     );
-    return res.status(200).json({ status: true, accessToken });
+    const refreshToken = jwt.sign(
+      { userId: user._id },
+      refreshKey,
+      { expiresIn: "1d" }
+    );
+    return res.status(201).json({ status: true, accessToken, refreshToken });
   } catch (error) {
     return res.status(401).json({
       message: error.message || error,
@@ -100,7 +107,7 @@ exports.getProfileUser = async (req, res) => {
     if (!user) return res.status(404).json({ message: "Not found profile" });
 
     await cacheSet(key, user, 300);
-    return res.status(200).json({ user });
+    return res.status(201).json({ user });
   } catch (e) {
     return res.status(500).json({ message: "Server Error", error: e.message });
   }
@@ -118,7 +125,7 @@ exports.getAllProfileUsers = async (req, res) => {
     const payload = { users, count: users.length };
 
     await cacheSet(key, payload, 120);
-    return res.status(200).json(payload);
+    return res.status(201).json(payload);
   } catch (e) {
     return res.status(500).json({ message: "Server Error", error: e.message });
   }
@@ -134,7 +141,6 @@ exports.loginGoogle = async (req, res) => {
 
     let user = await User.findOne({ email });
     let isNew = false;
-
     if (!user) {
       user = await User.create({
         email,
@@ -157,7 +163,7 @@ exports.loginGoogle = async (req, res) => {
       await cacheDel(`users:${user._id}`);
     }
 
-    return res.json({
+    return res.status(201).json({
       success: true,
       user,
       accessToken,
@@ -168,5 +174,74 @@ exports.loginGoogle = async (req, res) => {
       success: false,
       error: true,
     });
+  }
+};
+exports.forgotPassword = async (req, res) => {
+
+  try {
+    const { email } = req.body;
+
+    const user = await User.findOne({ email });
+    if (!user)
+      return res.status(400).json({ message: 'Email không tồn tại!' });
+
+    const resetToken = uuidv4()
+    const expires = new Date(Date.now() + 60 * 60 * 1000); // 1 giờ
+
+    user.resetToken = resetToken;
+    user.resetTokenExpires = expires;
+    await user.save();
+
+    const resetLink = `${process.env.BASE_URL}/api/users/resetpassword?token=${resetToken}`;
+
+    const transporter = nodemailer.createTransport({
+      service: 'gmail',
+      auth: {
+        user: process.env.MAIL_USERNAME,
+        pass: process.env.MAIL_PASSWORD
+      }
+    });
+
+    await transporter.sendMail({
+      from: process.env.MAIL_USERNAME,
+      to: email,
+      subject: 'Reset Password',
+      html: `<p>Click để đặt lại mật khẩu: <a href="${resetLink}">Reset Password</a></p>`
+    });
+
+    return res.status(200).json({ message: 'Email reset password đã được gửi.' });
+
+  } catch (err) {
+    res.status(500).json({ message: 'Lỗi server', error: err.message });
+  }
+}
+
+exports.resetPassword = async (req, res) => {
+  try {
+    const token = req.query.token || req.body.token;
+    const { newPassword } = req.body;
+
+    if (!token || !newPassword)
+      return res.status(400).json({ message: 'Thiếu token hoặc mật khẩu mới.' });
+
+    const user = await User.findOne({
+      resetToken: token,
+      resetTokenExpires: { $gt: new Date() }
+    });
+
+    if (!user) {
+      return res.status(400).json({ message: 'Token không hợp lệ hoặc đã hết hạn.' });
+    }
+    user.password = await bryctjs.hash(newPassword, 10);
+    user.resetToken = undefined;
+    user.resetTokenExpires = undefined;
+    await user.save();
+
+    return res.status(200).json({ message: 'Đặt lại mật khẩu thành công.' });
+
+
+
+  } catch (err) {
+    res.status(500).json({ message: 'Lỗi server', error: err.message });
   }
 };

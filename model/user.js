@@ -18,7 +18,7 @@ const userSchema = new schema({
     },
     email: {
         type: String,
-
+        unique: true,
     },
     phoneNumber: {
         type: String,
@@ -32,6 +32,16 @@ const userSchema = new schema({
         type: String,
         enum: ["local", "google"],
         default: "local"
+    },
+    gender: {
+        type: String,
+        enum: ['male', 'female']
+    },
+    resetToken: {
+        type: String
+    },
+    resetTokenExpires: {
+        type: Date
     }
 }, { timestamps: true })
 const user = mongoose.model('User', userSchema);

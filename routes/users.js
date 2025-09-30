@@ -3,6 +3,7 @@ var router = express.Router();
 const user = require('../controller/UserController');
 const auth = require('../middlewares/auth');
 
+
 /**
  * @swagger
  * tags:
@@ -141,6 +142,8 @@ router.get('/getallprofile', auth.authMiddleWare,
 router.post('/loginfirebase',
     user.loginGoogle
 )
+router.post('/forgetpassword', user.forgotPassword);
+router.post('/resetpassword', user.resetPassword)
 
 
 module.exports = router;
