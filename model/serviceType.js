@@ -12,7 +12,7 @@ const serviceTypesSchema = new schema({
         type: Number
     },
     estimated_duration: {
-        type: Number
+        type: String
     },
     is_active: {
         type: Boolean,
@@ -21,7 +21,11 @@ const serviceTypesSchema = new schema({
     service_package_id: {
         type: mongoose.Types.ObjectId,
         ref: "ServicePackage",
-        required: true
+        // required: true
+    },
+    vehicle_id: {
+        type: String,
+        ref: "Vehicle"
     }
 }, { timestamps: true })
 const serviceTypes = mongoose.model('ServiceType', serviceTypesSchema)

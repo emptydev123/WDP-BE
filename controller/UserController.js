@@ -14,7 +14,17 @@ exports.registerUser = async (req, res) => {
 
     const checkuserName = await User.findOne({ username }).lean();
     if (checkuserName) {
-      return res.status(400).json({ message: "Please Create New UserName" });
+      return res.status(400).json({
+        message: "Please Create New UserName",
+        success: false
+      });
+    }
+    const checkfullName = await User.findOne({ fullName }).lean();
+    if (checkfullName) {
+      return res.status(400).json({
+        message: "Please Create New Full Name",
+        success: false
+      })
     }
 
     const salt = await bryctjs.genSalt(10);

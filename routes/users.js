@@ -139,11 +139,90 @@ router.get('/getallprofile', auth.authMiddleWare,
     user.getAllProfileUsers
 );
 
-router.post('/loginfirebase',
-    user.loginGoogle
-)
-router.post('/forgetpassword', user.forgotPassword);
-router.post('/resetpassword', user.resetPassword)
+/**
+ * @swagger
+ * /api/users/loginGoogle:
+ *   post:
+ *     summary: Đăng nhập bằng Google
+ *     tags: [Users]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - idToken
+ *             properties:
+ *               idToken:
+ *                 type: string
+ *                 example: "eyJhbGciOiJSUzI1NiIsImtpZCI6..."
+ *     responses:
+ *       201:
+ *         description: Đăng nhập thành công
+ *       401:
+ *         description: Token Google không hợp lệ
+ */
+router.post("/loginfirebase", user.loginGoogle);
+
+/**
+ * @swagger
+ * /api/users/forgotPassword:
+ *   post:
+ *     summary: Yêu cầu reset mật khẩu (gửi email có link reset)
+ *     tags: [Users]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - email
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 example: "customer@gmail.com"
+ *     responses:
+ *       200:
+ *         description: Email reset password đã được gửi
+ *       400:
+ *         description: Email không tồn tại
+ */
+router.post("/forgotPassword", user.forgotPassword);
+
+/**
+ * @swagger
+ * /api/users/resetpassword:
+ *   post:
+ *     summary: Đặt lại mật khẩu mới
+ *     tags: [Users]
+ *     parameters:
+ *       - in: query
+ *         name: token
+ *         schema:
+ *           type: string
+ *         required: true
+ *         description: Token reset password
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - newPassword
+ *             properties:
+ *               newPassword:
+ *                 type: string
+ *                 example: "newPassword123"
+ *     responses:
+ *       200:
+ *         description: Đặt lại mật khẩu thành công
+ *       400:
+ *         description: Token không hợp lệ hoặc hết hạn
+ */
+router.post("/resetpassword", user.resetPassword);
 
 
 module.exports = router;
