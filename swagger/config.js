@@ -9,15 +9,15 @@ const options = {
       version: "1.0.0",
       description: "API docs cho project của bạn",
     },
-    servers: [
-      {
-        // Động thay đổi server URL
-        url:
-          process.env.NODE_ENV === "production"
-            ? "https://wdp-fxxksr33l-huyphan1232203s-projects.vercel.app"
-            : "http://localhost:5000",
-      },
-    ],
+    // servers: [
+    //   {
+    //     // Động thay đổi server URL
+    //     url:
+    //       process.env.NODE_ENV === "production"
+    //         ? "https://wdp-fxxksr33l-huyphan1232203s-projects.vercel.app"
+    //         : "http://localhost:5000",
+    //   },
+    // ],
     components: {
       securitySchemes: {
         bearerAuth: {

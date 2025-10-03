@@ -26,7 +26,13 @@ app.use(cookieParser());
 app.use(bodyParser.json());
 app.use(express.static(path.join(__dirname, "public")));
 
-app.use(cors());
+app.use(
+  cors({
+    origin: "*", // Cho phép tất cả origins
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+  })
+);
 
 // connect DB
 dbConnect();
