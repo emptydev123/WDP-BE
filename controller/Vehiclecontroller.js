@@ -3,7 +3,6 @@ var VehicleModel = require('../model/vehicleModel')
 // Create Vehicle Model
 exports.createVehicleModel = async (req, res) => {
     try {
-        // khoảng thời gian bảo trì KM, bảo trì theo tháng 
         const { brand, model_name, year, battery_type, maintenanceIntervalKm, maintenanceIntervaMonths } = req.body;
         const newModel = new VehicleModel({
             brand,
