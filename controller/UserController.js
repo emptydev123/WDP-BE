@@ -4,7 +4,7 @@ var bryctjs = require("bcryptjs");
 var jwt = require("jsonwebtoken");
 var admin = require("../firebase/firebase");
 const nodemailer = require('nodemailer');
-const { v4: uuidv4 } = require('uuid');
+const { v4: uuidv4 } = require("uuid");
 const { cacheGet, cacheSet, cacheDel } = require("../services/redis");
 const crypto = require('crypto');
 
