@@ -4,7 +4,7 @@ var bryctjs = require("bcryptjs");
 var jwt = require("jsonwebtoken");
 var admin = require("../firebase/firebase");
 const nodemailer = require('nodemailer');
-const { v4: uuidv4 } = require('uuid');
+const { v4: uuidv4 } = require("uuid");
 const { cacheGet, cacheSet, cacheDel } = require("../services/redis");
 const crypto = require('crypto');
 
@@ -202,8 +202,7 @@ exports.forgotPassword = async (req, res) => {
     user.resetTokenExpires = expires;
     await user.save();
 
-    const resetLink = `${process.env.BASE_URL}/api/users/resetpassword?token=${resetToken}`;
-
+    const resetLink = `${process.env.FRONTEND_URL || process.env.BASE_URL}/reset-password?token=${resetToken}`;
     const transporter = nodemailer.createTransport({
       service: 'gmail',
       auth: {

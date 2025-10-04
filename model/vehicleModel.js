@@ -14,8 +14,11 @@ const VehicleModelSchema = new schema({
         type: String,
 
     },
-    motor_type: {
-        type: String
+    type_model: {
+        type: String,
+        enum: ["1", "2", "3"]
+        // 1 phổ thông, 2 trung cấp, 3 cao cấp
+
     },
     maintenanceIntervalKm: {
         type: Number

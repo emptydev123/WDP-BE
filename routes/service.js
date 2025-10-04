@@ -1,4 +1,4 @@
-var service = require('../controller/serviceController');
+var service = require('../controller/ServiceController');
 var express = require('express');
 var router = express.Router();
 const auth = require('../middlewares/auth');
