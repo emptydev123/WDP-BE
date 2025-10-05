@@ -1,48 +1,53 @@
-const mongoose = require('mongoose')
-const schema = mongoose.Schema
-const appointmentSchema = new schema({
+const mongoose = require("mongoose");
+const schema = mongoose.Schema;
+const appointmentSchema = new schema(
+  {
     appoinment_date: {
-        type: Date
-
+      type: Date,
     },
     appoinment_time: {
-        type: String,
-        require: true
+      type: String,
+      require: true,
     },
     status: {
-        type: String,
-        enum: ['pending', 'accept', 'completed', 'canceled'],
-        default: "pending"
+      type: String,
+      enum: ["pending", "accept", "completed", "canceled"],
+      default: "pending",
     },
     notes: {
-        type: String
-
+      type: String,
     },
     estimated_cost: {
-        type: Number
+      type: Number,
     },
     user_id: {
-        type: mongoose.Types.ObjectId,
-        ref: "User",
-        required: true,
+      type: mongoose.Types.ObjectId,
+      ref: "User",
+      required: true,
     },
     record_id: {
-        type: mongoose.Types.ObjectId,
-        ref: "ServiceRecord",
-        required: true
+      type: mongoose.Types.ObjectId,
+      ref: "ServiceRecord",
+      required: true,
     },
     vehicle_id: {
-        type: mongoose.Types.ObjectId,
-        ref: "Vehicle",
-        required: true
+      type: mongoose.Types.ObjectId,
+      ref: "Vehicle",
+      required: true,
     },
     center_id: {
-        type: mongoose.Types.ObjectId,
-        ref: "ServiceCenter",
-        required: true,
-    }
-
-
-}, { timestamps: true })
-const appointment = mongoose.model('Appointment', appointmentSchema)
-module.exports = appointment
+      type: mongoose.Types.ObjectId,
+      ref: "ServiceCenter",
+      required: true,
+    },
+    assigned_schedule_id: {
+      type: mongoose.Types.ObjectId,
+      ref: "AssignSchedule",
+      unique: true,
+      required: false,
+    },
+  },
+  { timestamps: true }
+);
+const appointment = mongoose.model("Appointment", appointmentSchema);
+module.exports = appointment;

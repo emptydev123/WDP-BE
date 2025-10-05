@@ -14,11 +14,7 @@ var cors = require("cors");
 const admin = require("./firebase/firebase");
 const swaggerDocs = require("./swagger/config");
 const bodyParser = require("body-parser");
-// view engine setup
-// 123
-app.set("views", path.join(__dirname, "views"));
-// app.set('view engine', 'jade');
-app.set("view engine", "pug");
+// API only - no view engine needed
 app.use(logger("dev"));
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
@@ -52,7 +48,11 @@ app.use(function (err, req, res, next) {
 
   // render the error page
   res.status(err.status || 500);
-  res.render("error");
+  res.json({
+    message: err.message,
+    error: req.app.get("env") === "development" ? err : {},
+    success: false,
+  });
 });
 // app.listen(PORT, () => {
 //   console.log(` Server running on http://localhost:${PORT}`);

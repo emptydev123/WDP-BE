@@ -1,16 +1,19 @@
-// controller/PaymentController.js
 const { PayOS } = require("@payos/node");
 const User = require("../model/user");
 const Payment = require("../model/payment");
+const {
+  createPagination,
+  createPaymentResponse,
+  createTransactionResponse,
+  validatePagination,
+} = require("../utils/pagination");
 
-// Khởi tạo PayOS client
 const payOS = new PayOS(
   process.env.PAYOS_CLIENT_ID,
   process.env.PAYOS_API_KEY,
   process.env.PAYOS_CHECKSUM_KEY
 );
 
-// Tạo link thanh toán
 exports.createPaymentLink = async (req, res) => {
   try {
     const { amount, description } = req.body;
@@ -23,7 +26,6 @@ exports.createPaymentLink = async (req, res) => {
       });
     }
 
-    // Validate input
     if (!amount || amount <= 0) {
       return res.status(400).json({
         message: "Số tiền không hợp lệ",
@@ -38,7 +40,6 @@ exports.createPaymentLink = async (req, res) => {
       });
     }
 
-    // Validate description length (PayOS limit: 25 characters)
     if (description.length > 25) {
       return res.status(400).json({
         message: "Mô tả thanh toán tối đa 25 ký tự",
@@ -46,7 +47,6 @@ exports.createPaymentLink = async (req, res) => {
       });
     }
 
-    // Lấy thông tin user đầy đủ
     const user = await User.findById(userId).select("-password");
     if (!user) {
       return res.status(404).json({
@@ -55,12 +55,10 @@ exports.createPaymentLink = async (req, res) => {
       });
     }
 
-    // Tạo order_code duy nhất
     const order_code = parseInt(
       Date.now().toString() + Math.floor(Math.random() * 1000)
     );
 
-    // Tạo payment link với PayOS
     const paymentDataForPayOS = {
       orderCode: order_code,
       amount: amount,
@@ -80,7 +78,6 @@ exports.createPaymentLink = async (req, res) => {
       paymentDataForPayOS
     );
 
-    // Lưu payment vào database
     const paymentData = {
       order_code: order_code,
       amount: amount,
@@ -125,7 +122,6 @@ exports.createPaymentLink = async (req, res) => {
   }
 };
 
-// Cập nhật trạng thái thanh toán
 exports.updatePaymentStatus = async (req, res) => {
   try {
     const { order_code, status } = req.body;
@@ -137,7 +133,6 @@ exports.updatePaymentStatus = async (req, res) => {
       });
     }
 
-    // Validate status
     const validStatuses = ["pending", "paid", "cancelled", "failed"];
     if (!validStatuses.includes(status)) {
       return res.status(400).json({
@@ -147,7 +142,6 @@ exports.updatePaymentStatus = async (req, res) => {
       });
     }
 
-    // Tìm payment trong database và cập nhật trạng thái
     const payment = await Payment.findOne({ order_code: parseInt(order_code) });
 
     if (!payment) {
@@ -157,7 +151,6 @@ exports.updatePaymentStatus = async (req, res) => {
       });
     }
 
-    // Cập nhật trạng thái trong database
     payment.status = status;
     if (status === "paid") {
       payment.paid_at = new Date();
@@ -186,7 +179,6 @@ exports.updatePaymentStatus = async (req, res) => {
   }
 };
 
-// Lấy thông tin transaction thanh toán
 exports.getPaymentTransaction = async (req, res) => {
   try {
     const { order_code } = req.params;
@@ -198,7 +190,6 @@ exports.getPaymentTransaction = async (req, res) => {
       });
     }
 
-    // Lấy thông tin payment từ database với thông tin user
     const payment = await Payment.findOne({ order_code: parseInt(order_code) })
       .populate("user_id", "username fullName email phone address role")
       .lean();
@@ -210,7 +201,6 @@ exports.getPaymentTransaction = async (req, res) => {
       });
     }
 
-    // Lấy thông tin transaction từ PayOS
     const transactionInfo = await payOS.paymentRequests.get(
       parseInt(order_code)
     );
@@ -245,7 +235,6 @@ exports.getPaymentTransaction = async (req, res) => {
   }
 };
 
-// Xử lý khi thanh toán thành công (return URL)
 exports.paymentSuccess = async (req, res) => {
   try {
     const { order_code } = req.query;
@@ -259,7 +248,6 @@ exports.paymentSuccess = async (req, res) => {
 
     console.log(` Thanh toán thành công: ${order_code}`);
 
-    // Redirect về frontend với thông tin thành công
     const frontendUrl = `${
       process.env.FRONTEND_URL || "http://localhost:5173"
     }/payment/success?order_code=${order_code}`;
@@ -275,7 +263,6 @@ exports.paymentSuccess = async (req, res) => {
   }
 };
 
-// Xử lý khi thanh toán bị hủy (cancel URL)
 exports.paymentCancel = async (req, res) => {
   try {
     const { order_code } = req.query;
@@ -289,7 +276,6 @@ exports.paymentCancel = async (req, res) => {
 
     console.log(` Thanh toán bị hủy: ${order_code}`);
 
-    // Redirect về frontend với thông tin hủy
     const frontendUrl = `${
       process.env.FRONTEND_URL || "http://localhost:5173"
     }/payment/cancel?order_code=${order_code}`;
@@ -305,7 +291,6 @@ exports.paymentCancel = async (req, res) => {
   }
 };
 
-// Lấy danh sách thanh toán từ database
 exports.getPaymentList = async (req, res) => {
   try {
     const userId = req._id?.toString();
@@ -318,34 +303,32 @@ exports.getPaymentList = async (req, res) => {
       });
     }
 
-    // Lấy payments từ database
+    const { page: validatedPage, limit: validatedLimit } = validatePagination(
+      page,
+      limit
+    );
+
     const query = {};
     if (status) {
       query.status = status;
     }
 
+    const total = await Payment.countDocuments(query);
+    const pagination = createPagination(validatedPage, validatedLimit, total);
+
     const payments = await Payment.find(query)
       .populate("user_id", "username fullName email phone address role")
       .sort({ createdAt: -1 })
-      .limit(limit * 1)
-      .skip((page - 1) * limit)
+      .skip(pagination.skip)
+      .limit(pagination.limit)
       .lean();
 
-    const total = await Payment.countDocuments(query);
-
-    return res.status(200).json({
-      message: "Lấy danh sách thanh toán thành công",
-      success: true,
-      data: {
-        payments: payments,
-        pagination: {
-          current_page: parseInt(page),
-          total_pages: Math.ceil(total / limit),
-          total_items: total,
-          items_per_page: parseInt(limit),
-        },
-      },
-    });
+    const response = createPaymentResponse(
+      payments,
+      pagination,
+      "Lấy danh sách thanh toán thành công"
+    );
+    return res.status(200).json(response);
   } catch (error) {
     console.error("Get payment list error:", error);
     return res.status(500).json({
@@ -356,7 +339,6 @@ exports.getPaymentList = async (req, res) => {
   }
 };
 
-// Lấy danh sách transaction theo username
 exports.getUserTransactions = async (req, res) => {
   try {
     const { username } = req.params;
@@ -369,7 +351,6 @@ exports.getUserTransactions = async (req, res) => {
       });
     }
 
-    // Lấy thông tin user theo username
     const user = await User.findOne({ username: username }).select("-password");
     if (!user) {
       return res.status(404).json({
@@ -378,21 +359,25 @@ exports.getUserTransactions = async (req, res) => {
       });
     }
 
-    // Lấy transactions từ database
+    const { page: validatedPage, limit: validatedLimit } = validatePagination(
+      page,
+      limit
+    );
+
     const query = { user_id: user._id };
     if (status) {
       query.status = status;
     }
 
+    const total = await Payment.countDocuments(query);
+    const pagination = createPagination(validatedPage, validatedLimit, total);
+
     const transactions = await Payment.find(query)
       .sort({ createdAt: -1 })
-      .limit(limit * 1)
-      .skip((page - 1) * limit)
+      .skip(pagination.skip)
+      .limit(pagination.limit)
       .lean();
 
-    const total = await Payment.countDocuments(query);
-
-    // Format transactions theo yêu cầu
     const formattedTransactions = transactions.map((transaction) => ({
       _id: transaction._id,
       order_code: transaction.order_code,
@@ -407,19 +392,12 @@ exports.getUserTransactions = async (req, res) => {
       updatedAt: transaction.updatedAt,
     }));
 
-    return res.status(200).json({
-      message: "Lấy danh sách transaction theo user thành công",
-      success: true,
-      data: {
-        transactions: formattedTransactions,
-        pagination: {
-          current_page: parseInt(page),
-          total_pages: Math.ceil(total / limit),
-          total_items: total,
-          items_per_page: parseInt(limit),
-        },
-      },
-    });
+    const response = createTransactionResponse(
+      formattedTransactions,
+      pagination,
+      "Lấy danh sách transaction theo user thành công"
+    );
+    return res.status(200).json(response);
   } catch (error) {
     console.error("Get user transactions error:", error);
     return res.status(500).json({
