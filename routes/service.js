@@ -1,7 +1,7 @@
-var service = require('../controller/ServiceController');
-var express = require('express');
+var service = require("../controller/serviceController");
+var express = require("express");
 var router = express.Router();
-const auth = require('../middlewares/auth');
+const auth = require("../middlewares/auth");
 
 /**
  * @swagger
@@ -52,10 +52,10 @@ const auth = require('../middlewares/auth');
  *         description: Lỗi server
  */
 router.post(
-    "/create",
-    auth.authMiddleWare,
-    auth.requireRole("staff", "admin"),
-    service.createService
+  "/create",
+  auth.authMiddleWare,
+  auth.requireRole("staff", "admin"),
+  service.createService
 );
 
 /**
@@ -75,10 +75,10 @@ router.post(
  *         description: Lỗi server
  */
 router.get(
-    "/get",
-    auth.authMiddleWare,
-    auth.requireRole("customer", "staff", "admin", "techical"),
-    service.getService
+  "/get",
+  auth.authMiddleWare,
+  auth.requireRole("customer", "staff", "admin", "techical"),
+  service.getService
 );
 
-module.exports = router
+module.exports = router;
