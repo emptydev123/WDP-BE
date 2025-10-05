@@ -7,7 +7,7 @@ const auth = require("../middlewares/auth");
  * @swagger
  * tags:
  *   name: Payments
- *   description: API quản lý thanh toán PayOS (không lưu database)
+ *   description: API quản lý thanh toán PayOS
  */
 
 /**
