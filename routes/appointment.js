@@ -149,6 +149,119 @@ router.get(
 
 /**
  * @swagger
+ * /api/appointment/create:
+ *   post:
+ *     summary: Tạo appointment mới
+ *     tags: [Appointments]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - appoinment_date
+ *               - appoinment_time
+ *               - user_id
+ *               - record_id
+ *               - vehicle_id
+ *               - center_id
+ *             properties:
+ *               appoinment_date:
+ *                 type: string
+ *                 format: date
+ *                 example: "2024-01-15"
+ *                 description: Ngày hẹn
+ *               appoinment_time:
+ *                 type: string
+ *                 example: "09:00"
+ *                 description: Giờ hẹn
+ *               notes:
+ *                 type: string
+ *                 example: "Bảo dưỡng định kỳ xe điện"
+ *                 description: Ghi chú
+ *               estimated_cost:
+ *                 type: number
+ *                 example: 500000
+ *                 description: Chi phí ước tính
+ *               user_id:
+ *                 type: string
+ *                 example: "68d4e34293dfe03972909142"
+ *                 description: ID của user
+ *               record_id:
+ *                 type: string
+ *                 example: "68e0f04908abb1b3a1334e52"
+ *                 description: ID của service record
+ *               vehicle_id:
+ *                 type: string
+ *                 example: "68e0f04908abb1b3a1334e53"
+ *                 description: ID của vehicle
+ *               center_id:
+ *                 type: string
+ *                 example: "68e0f04908abb1b3a1334e54"
+ *                 description: ID của service center
+ *     responses:
+ *       201:
+ *         description: Tạo appointment thành công
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                 success:
+ *                   type: boolean
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     _id:
+ *                       type: string
+ *                     appoinment_date:
+ *                       type: string
+ *                       format: date-time
+ *                     appoinment_time:
+ *                       type: string
+ *                     status:
+ *                       type: string
+ *                     estimated_cost:
+ *                       type: number
+ *                     user_id:
+ *                       type: object
+ *                     center_id:
+ *                       type: object
+ *                     vehicle_id:
+ *                       type: object
+ *                     assigned_by:
+ *                       type: object
+ *                     assigned:
+ *                       type: object
+ *                     createdAt:
+ *                       type: string
+ *                       format: date-time
+ *                     updatedAt:
+ *                       type: string
+ *                       format: date-time
+ *       400:
+ *         description: Thiếu thông tin bắt buộc
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: Không tìm thấy user, vehicle hoặc service center
+ *       500:
+ *         description: Lỗi server
+ */
+router.post(
+  "/create",
+  auth.authMiddleWare,
+  auth.requireRole("customer", "admin"),
+  appointment.createAppointment
+);
+
+/**
+ * @swagger
  * /api/appointment/assign-technician:
  *   post:
  *     summary: Nhận lịch (assign technician)
@@ -164,8 +277,6 @@ router.get(
  *             required:
  *               - appointment_id
  *               - technician_id
- *               - time_start
- *               - time_end
  *             properties:
  *               appointment_id:
  *                 type: string
@@ -175,14 +286,6 @@ router.get(
  *                 type: string
  *                 example: "68d4e34293dfe03972909142"
  *                 description: ID của technician
- *               time_start:
- *                 type: string
- *                 example: "09:00"
- *                 description: Thời gian bắt đầu làm việc
- *               time_end:
- *                 type: string
- *                 example: "17:00"
- *                 description: Thời gian kết thúc làm việc
  *     responses:
  *       200:
  *         description: Nhận lịch thành công
@@ -195,7 +298,7 @@ router.get(
  *       500:
  *         description: Lỗi server
  */
-router.post(
+router.put(
   "/assign-technician",
   auth.authMiddleWare,
   auth.requireRole("staff", "admin"),
@@ -205,7 +308,7 @@ router.post(
 /**
  * @swagger
  * /api/appointment/update-status:
- *   post:
+ *   put:
  *     summary: Thay đổi trạng thái appointment
  *     tags: [Appointments]
  *     security:
@@ -241,94 +344,11 @@ router.post(
  *       500:
  *         description: Lỗi server
  */
-router.post(
+router.put(
   "/update-status",
   auth.authMiddleWare,
   auth.requireRole("staff", "admin"),
   appointment.updateAppointmentStatus
-);
-
-/**
- * @swagger
- * /api/appointment/update-service-record:
- *   post:
- *     summary: Quản lý phiếu tiếp nhận dịch vụ + checklist EV
- *     tags: [Appointments]
- *     security:
- *       - bearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - appointment_id
- *               - service_record
- *             properties:
- *               appointment_id:
- *                 type: string
- *                 example: "68e0f04908abb1b3a1334e52"
- *                 description: ID của appointment
- *               service_record:
- *                 type: object
- *                 properties:
- *                   pre_service_check:
- *                     type: object
- *                     properties:
- *                       battery_level:
- *                         type: string
- *                       tire_condition:
- *                         type: string
- *                       brake_system:
- *                         type: string
- *                       charging_port:
- *                         type: string
- *                   service_performed:
- *                     type: array
- *                     items:
- *                       type: string
- *                   parts_replaced:
- *                     type: array
- *                     items:
- *                       type: object
- *                       properties:
- *                         part_name:
- *                           type: string
- *                         part_number:
- *                           type: string
- *                         quantity:
- *                           type: number
- *                   post_service_check:
- *                     type: object
- *                     properties:
- *                       test_drive:
- *                         type: boolean
- *                       charging_test:
- *                         type: boolean
- *                       system_check:
- *                         type: boolean
- *                   technician_notes:
- *                     type: string
- *                   customer_signature:
- *                     type: string
- *     responses:
- *       200:
- *         description: Cập nhật phiếu tiếp nhận dịch vụ thành công
- *       400:
- *         description: Dữ liệu đầu vào không hợp lệ
- *       401:
- *         description: Unauthorized
- *       404:
- *         description: Không tìm thấy appointment
- *       500:
- *         description: Lỗi server
- */
-router.post(
-  "/update-service-record",
-  auth.authMiddleWare,
-  auth.requireRole("staff", "admin"),
-  appointment.updateServiceRecord
 );
 
 /**
@@ -477,8 +497,58 @@ router.post(
 router.get(
   "/user/:username",
   auth.authMiddleWare,
-  auth.requireRole("staff", "admin"),
+  auth.requireRole("customer", "staff", "admin"),
   appointment.getAppointmentsByUsername
+);
+
+/**
+ * @swagger
+ * /api/appointment/technician/{technicianId}:
+ *   get:
+ *     summary: Lấy danh sách appointment theo technician
+ *     tags: [Appointments]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: technicianId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: ID của technician
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *         description: Số trang
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 10
+ *         description: Số item per page
+ *       - in: query
+ *         name: status
+ *         schema:
+ *           type: string
+ *           enum: [pending, accept, completed, canceled]
+ *         description: Lọc theo trạng thái
+ *     responses:
+ *       200:
+ *         description: Lấy danh sách appointment theo technician thành công
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: Không tìm thấy technician
+ *       500:
+ *         description: Lỗi server
+ */
+router.get(
+  "/technician/:technicianId",
+  auth.authMiddleWare,
+  auth.requireRole("staff", "admin"),
+  appointment.getAppointmentsByTechnician
 );
 
 /**
@@ -509,8 +579,51 @@ router.get(
 router.get(
   "/:appointmentId",
   auth.authMiddleWare,
-  auth.requireRole("staff", "admin"),
+  auth.requireRole("customer", "staff", "admin"),
   appointment.getAppointmentById
+);
+
+/**
+ * @swagger
+ * /api/appointment/{appointmentId}:
+ *   delete:
+ *     summary: Xóa appointment (chỉ cho phép xóa appointment có trạng thái pending)
+ *     tags: [Appointments]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: appointmentId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: ID của appointment cần xóa
+ *     responses:
+ *       200:
+ *         description: Xóa appointment thành công
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                 success:
+ *                   type: boolean
+ *       400:
+ *         description: Chỉ có thể xóa appointment có trạng thái pending
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: Không tìm thấy appointment
+ *       500:
+ *         description: Lỗi server
+ */
+router.delete(
+  "/:appointmentId",
+  auth.authMiddleWare,
+  auth.requireRole("customer", "staff", "admin"),
+  appointment.deleteAppointment
 );
 
 module.exports = router;
