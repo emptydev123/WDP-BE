@@ -2,7 +2,6 @@ const Appointment = require("../model/appointment");
 const User = require("../model/user");
 const ServiceCenter = require("../model/serviceCenter");
 const Vehicle = require("../model/vehicle");
-const AssignSchedule = require("../model/assignSchedule");
 const {
   createPagination,
   createAppointmentResponse,
@@ -42,19 +41,8 @@ exports.getAppointments = async (req, res) => {
       .populate("user_id", "username fullName email phone")
       .populate("center_id", "name address phone")
       .populate("vehicle_id", "license_plate brand model year")
-      .populate({
-        path: "assigned_schedule_id",
-        populate: [
-          {
-            path: "user_id",
-            select: "username fullName email phone role",
-          },
-          {
-            path: "assigned_by",
-            select: "username fullName email",
-          },
-        ],
-      })
+      .populate("assigned_by", "username fullName email phone role")
+      .populate("assigned", "username fullName email phone role")
       .sort({ appoinment_date: -1 })
       .skip(pagination.skip)
       .limit(pagination.limit)
@@ -74,7 +62,7 @@ exports.getAppointments = async (req, res) => {
 
 exports.assignTechnician = async (req, res) => {
   try {
-    const { appointment_id, technician_id, time_start, time_end } = req.body;
+    const { appointment_id, technician_id } = req.body;
     const assignedBy = req._id?.toString();
 
     if (!assignedBy) {
@@ -84,10 +72,9 @@ exports.assignTechnician = async (req, res) => {
       });
     }
 
-    if (!appointment_id || !technician_id || !time_start || !time_end) {
+    if (!appointment_id || !technician_id) {
       return res.status(400).json({
-        message:
-          "Thiếu appointment_id, technician_id, time_start hoặc time_end",
+        message: "Thiếu appointment_id hoặc technician_id",
         success: false,
       });
     }
@@ -100,7 +87,7 @@ exports.assignTechnician = async (req, res) => {
       });
     }
 
-    if (appointment.assigned_schedule_id) {
+    if (appointment.assigned) {
       return res.status(400).json({
         message: "Appointment đã được assign cho technician khác",
         success: false,
@@ -115,18 +102,9 @@ exports.assignTechnician = async (req, res) => {
       });
     }
 
-    const newAssignSchedule = new AssignSchedule({
-      user_id: technician_id,
-      appointment_id: appointment_id,
-      time_start: time_start,
-      time_end: time_end,
-      assigned_by: assignedBy,
-      status: "active",
-    });
-
-    const savedAssignSchedule = await newAssignSchedule.save();
-
-    appointment.assigned_schedule_id = savedAssignSchedule._id;
+    // Cập nhật appointment với thông tin assignment
+    appointment.assigned_by = assignedBy;
+    appointment.assigned = technician_id;
     appointment.status = "accept";
     await appointment.save();
 
@@ -134,19 +112,8 @@ exports.assignTechnician = async (req, res) => {
       .populate("user_id", "username fullName email phone")
       .populate("center_id", "name address phone")
       .populate("vehicle_id", "license_plate brand model year")
-      .populate({
-        path: "assigned_schedule_id",
-        populate: [
-          {
-            path: "user_id",
-            select: "username fullName email phone role",
-          },
-          {
-            path: "assigned_by",
-            select: "username fullName email",
-          },
-        ],
-      })
+      .populate("assigned_by", "username fullName email phone role")
+      .populate("assigned", "username fullName email phone role")
       .lean();
 
     return res.status(200).json({
@@ -224,57 +191,6 @@ exports.updateAppointmentStatus = async (req, res) => {
   }
 };
 
-exports.updateServiceRecord = async (req, res) => {
-  try {
-    const { appointment_id, service_record } = req.body;
-    const userId = req._id?.toString();
-
-    if (!userId) {
-      return res.status(401).json({
-        message: "Unauthorized",
-        success: false,
-      });
-    }
-
-    if (!appointment_id || !service_record) {
-      return res.status(400).json({
-        message: "Thiếu appointment_id hoặc service_record",
-        success: false,
-      });
-    }
-
-    const appointment = await Appointment.findById(appointment_id);
-    if (!appointment) {
-      return res.status(404).json({
-        message: "Không tìm thấy appointment",
-        success: false,
-      });
-    }
-
-    appointment.notes = service_record.technician_notes || appointment.notes;
-    await appointment.save();
-
-    const updatedAppointment = await Appointment.findById(appointment_id)
-      .populate("user_id", "username fullName email phone")
-      .populate("center_id", "name address phone")
-      .populate("vehicle_id", "license_plate brand model year")
-      .lean();
-
-    return res.status(200).json({
-      message: "Cập nhật phiếu tiếp nhận dịch vụ thành công",
-      success: true,
-      data: updatedAppointment,
-    });
-  } catch (error) {
-    console.error("Update service record error:", error);
-    return res.status(500).json({
-      message: "Lỗi cập nhật phiếu tiếp nhận dịch vụ",
-      error: error.message,
-      success: false,
-    });
-  }
-};
-
 exports.getAppointmentById = async (req, res) => {
   try {
     const { appointmentId } = req.params;
@@ -291,19 +207,8 @@ exports.getAppointmentById = async (req, res) => {
       .populate("user_id", "username fullName email phone address")
       .populate("center_id", "name address phone")
       .populate("vehicle_id", "license_plate brand model year color")
-      .populate({
-        path: "assigned_schedule_id",
-        populate: [
-          {
-            path: "user_id",
-            select: "username fullName email phone role",
-          },
-          {
-            path: "assigned_by",
-            select: "username fullName email",
-          },
-        ],
-      })
+      .populate("assigned_by", "username fullName email phone role")
+      .populate("assigned", "username fullName email phone role")
       .lean();
 
     if (!appointment) {
@@ -367,19 +272,8 @@ exports.getAppointmentsByUsername = async (req, res) => {
       .populate("user_id", "username fullName email phone")
       .populate("center_id", "name address phone")
       .populate("vehicle_id", "license_plate brand model year")
-      .populate({
-        path: "assigned_schedule_id",
-        populate: [
-          {
-            path: "user_id",
-            select: "username fullName email phone role",
-          },
-          {
-            path: "assigned_by",
-            select: "username fullName email",
-          },
-        ],
-      })
+      .populate("assigned_by", "username fullName email phone role")
+      .populate("assigned", "username fullName email phone role")
       .sort({ appoinment_date: -1 })
       .skip(pagination.skip)
       .limit(pagination.limit)
@@ -395,6 +289,248 @@ exports.getAppointmentsByUsername = async (req, res) => {
     console.error("Get appointments by username error:", error);
     return res.status(500).json({
       message: "Lỗi lấy danh sách appointment theo username",
+      error: error.message,
+      success: false,
+    });
+  }
+};
+
+exports.getAppointmentsByTechnician = async (req, res) => {
+  try {
+    const { technicianId } = req.params;
+    const { page = 1, limit = 10, status } = req.query;
+    const userId = req._id?.toString();
+
+    if (!userId) {
+      return res.status(401).json({
+        message: "Unauthorized",
+        success: false,
+      });
+    }
+
+    if (!technicianId) {
+      return res.status(400).json({
+        message: "Thiếu technician ID",
+        success: false,
+      });
+    }
+
+    // Kiểm tra technician có tồn tại không
+    const technician = await User.findById(technicianId);
+    if (!technician) {
+      return res.status(404).json({
+        message: "Không tìm thấy technician",
+        success: false,
+      });
+    }
+
+    const { page: validatedPage, limit: validatedLimit } = validatePagination(
+      page,
+      limit
+    );
+
+    const query = { assigned: technicianId };
+    if (status) {
+      query.status = status;
+    }
+
+    const total = await Appointment.countDocuments(query);
+
+    const pagination = createPagination(validatedPage, validatedLimit, total);
+
+    const appointments = await Appointment.find(query)
+      .populate("user_id", "username fullName email phone")
+      .populate("center_id", "name address phone")
+      .populate("vehicle_id", "license_plate brand model year")
+      .populate("assigned_by", "username fullName email phone role")
+      .populate("assigned", "username fullName email phone role")
+      .sort({ appoinment_date: -1 })
+      .skip(pagination.skip)
+      .limit(pagination.limit)
+      .lean();
+
+    const response = createAppointmentResponse(
+      appointments,
+      pagination,
+      "Lấy danh sách appointment theo technician thành công"
+    );
+    return res.status(200).json(response);
+  } catch (error) {
+    console.error("Get appointments by technician error:", error);
+    return res.status(500).json({
+      message: "Lỗi lấy danh sách appointment theo technician",
+      error: error.message,
+      success: false,
+    });
+  }
+};
+
+// Tạo appointment mới
+exports.createAppointment = async (req, res) => {
+  try {
+    const {
+      appoinment_date,
+      appoinment_time,
+      notes,
+      estimated_cost,
+      user_id,
+      record_id,
+      vehicle_id,
+      center_id,
+      assigned, // Optional: customer có thể tự chọn technician ngay khi tạo
+    } = req.body;
+    const userId = req._id?.toString();
+
+    if (!userId) {
+      return res.status(401).json({
+        message: "Unauthorized",
+        success: false,
+      });
+    }
+
+    // Validation
+    if (
+      !appoinment_date ||
+      !appoinment_time ||
+      !user_id ||
+      !record_id ||
+      !vehicle_id ||
+      !center_id
+    ) {
+      return res.status(400).json({
+        message: "Thiếu thông tin bắt buộc",
+        success: false,
+      });
+    }
+
+    const user = await User.findById(user_id).select("-password");
+    if (!user) {
+      return res.status(404).json({
+        message: "Không tìm thấy user",
+        success: false,
+      });
+    }
+
+    const vehicle = await Vehicle.findById(vehicle_id);
+    if (!vehicle) {
+      return res.status(404).json({
+        message: "Không tìm thấy vehicle",
+        success: false,
+      });
+    }
+
+    const serviceCenter = await ServiceCenter.findById(center_id);
+    if (!serviceCenter) {
+      return res.status(404).json({
+        message: "Không tìm thấy service center",
+        success: false,
+      });
+    }
+
+    // Validation technician nếu được cung cấp
+    if (assigned) {
+      const technician = await User.findById(assigned);
+      if (!technician) {
+        return res.status(404).json({
+          message: "Không tìm thấy technician",
+          success: false,
+        });
+      }
+      // Kiểm tra role của technician
+      if (technician.role !== "technician") {
+        return res.status(400).json({
+          message: "User được gán không phải là technician",
+          success: false,
+        });
+      }
+    }
+
+    const appointment = new Appointment({
+      appoinment_date: new Date(appoinment_date),
+      appoinment_time,
+      notes,
+      estimated_cost,
+      user_id,
+      record_id,
+      vehicle_id,
+      center_id,
+      status: assigned ? "accept" : "pending", // Nếu customer chọn technician thì status = "accept"
+      assigned_by: assigned ? userId : null, // Customer tự gán technician
+      assigned: assigned || null, // Customer tự chọn technician
+    });
+
+    await appointment.save();
+
+    const populatedAppointment = await Appointment.findById(appointment._id)
+      .populate("user_id", "username fullName email phone")
+      .populate("center_id", "name address phone")
+      .populate("vehicle_id", "license_plate brand model year")
+      .populate("assigned_by", "username fullName email phone role")
+      .populate("assigned", "username fullName email phone role");
+
+    return res.status(201).json({
+      message: assigned
+        ? "Tạo appointment thành công và đã chọn technician"
+        : "Tạo appointment thành công",
+      success: true,
+      data: populatedAppointment,
+    });
+  } catch (error) {
+    console.error("Create appointment error:", error);
+    return res.status(500).json({
+      message: "Lỗi tạo appointment",
+      error: error.message,
+      success: false,
+    });
+  }
+};
+
+// Xóa appointment (chỉ cho phép xóa appointment có trạng thái pending)
+exports.deleteAppointment = async (req, res) => {
+  try {
+    const { appointmentId } = req.params;
+    const userId = req._id?.toString();
+
+    if (!userId) {
+      return res.status(401).json({
+        message: "Unauthorized",
+        success: false,
+      });
+    }
+
+    if (!appointmentId) {
+      return res.status(400).json({
+        message: "Thiếu appointment ID",
+        success: false,
+      });
+    }
+
+    const appointment = await Appointment.findById(appointmentId);
+    if (!appointment) {
+      return res.status(404).json({
+        message: "Không tìm thấy appointment",
+        success: false,
+      });
+    }
+
+    // Chỉ cho phép xóa appointment có trạng thái pending
+    if (appointment.status !== "pending") {
+      return res.status(400).json({
+        message: "Chỉ có thể xóa appointment có trạng thái pending",
+        success: false,
+      });
+    }
+
+    await Appointment.findByIdAndDelete(appointmentId);
+
+    return res.status(200).json({
+      message: "Xóa appointment thành công",
+      success: true,
+    });
+  } catch (error) {
+    console.error("Delete appointment error:", error);
+    return res.status(500).json({
+      message: "Lỗi xóa appointment",
       error: error.message,
       success: false,
     });

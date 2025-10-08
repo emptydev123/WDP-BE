@@ -1,14 +1,13 @@
-var express = require('express');
+var express = require("express");
 var router = express.Router();
-const user = require('../controller/UserController');
-const auth = require('../middlewares/auth');
-
+const user = require("../controller/UserController");
+const auth = require("../middlewares/auth");
 
 /**
  * @swagger
  * tags:
  *   name: Users
- *   description:  
+ *   description:
  */
 
 /**
@@ -49,7 +48,7 @@ const auth = require('../middlewares/auth');
  *       400:
  *         description: Lỗi validate
  */
-router.post('/register', user.registerUser);
+router.post("/register", user.registerUser);
 
 /**
  * @swagger
@@ -75,11 +74,11 @@ router.post('/register', user.registerUser);
  *                 example: 123456
  *     responses:
  *       200:
- *         description: Đăng nhập thành công, trả về accessToken 
+ *         description: Đăng nhập thành công, trả về accessToken
  *       401:
  *         description: Sai username hoặc password
  */
-router.post('/login', user.login);
+router.post("/login", user.login);
 
 /**
  * @swagger
@@ -103,9 +102,11 @@ router.post('/login', user.login);
  *       404:
  *         description: Profile không tìm thấy
  */
-router.get('/getprofile', auth.authMiddleWare,
-    auth.requireRole('customer', 'staff', 'admin'),
-    user.getProfileUser
+router.get(
+  "/getprofile",
+  auth.authMiddleWare,
+  auth.requireRole("customer", "staff", "admin"),
+  user.getProfileUser
 );
 
 /**
@@ -134,9 +135,11 @@ router.get('/getprofile', auth.authMiddleWare,
  *       403:
  *         description: Forbidden (không phải admin)
  */
-router.get('/getallprofile', auth.authMiddleWare,
-    auth.requireRole('admin',),
-    user.getAllProfileUsers
+router.get(
+  "/getallprofile",
+  auth.authMiddleWare,
+  auth.requireRole("admin"),
+  user.getAllProfileUsers
 );
 
 /**
@@ -223,6 +226,5 @@ router.post("/forgotPassword", user.forgotPassword);
  *         description: Token không hợp lệ hoặc hết hạn
  */
 router.post("/resetpassword", user.resetPassword);
-
 
 module.exports = router;
