@@ -25,11 +25,6 @@ const appointmentSchema = new schema(
       ref: "User",
       required: true,
     },
-    record_id: {
-      type: mongoose.Types.ObjectId,
-      ref: "ServiceRecord",
-      required: true,
-    },
     vehicle_id: {
       type: mongoose.Types.ObjectId,
       ref: "Vehicle",

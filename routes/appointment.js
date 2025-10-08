@@ -165,7 +165,6 @@ router.get(
  *               - appoinment_date
  *               - appoinment_time
  *               - user_id
- *               - record_id
  *               - vehicle_id
  *               - center_id
  *             properties:
@@ -190,10 +189,6 @@ router.get(
  *                 type: string
  *                 example: "68d4e34293dfe03972909142"
  *                 description: ID của user
- *               record_id:
- *                 type: string
- *                 example: "68e0f04908abb1b3a1334e52"
- *                 description: ID của service record
  *               vehicle_id:
  *                 type: string
  *                 example: "68e0f04908abb1b3a1334e53"
