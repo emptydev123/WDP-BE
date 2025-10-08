@@ -374,7 +374,6 @@ exports.createAppointment = async (req, res) => {
       notes,
       estimated_cost,
       user_id,
-      record_id,
       vehicle_id,
       center_id,
       assigned, // Optional: customer có thể tự chọn technician ngay khi tạo
@@ -393,7 +392,6 @@ exports.createAppointment = async (req, res) => {
       !appoinment_date ||
       !appoinment_time ||
       !user_id ||
-      !record_id ||
       !vehicle_id ||
       !center_id
     ) {
@@ -451,7 +449,6 @@ exports.createAppointment = async (req, res) => {
       notes,
       estimated_cost,
       user_id,
-      record_id,
       vehicle_id,
       center_id,
       status: assigned ? "accept" : "pending", // Nếu customer chọn technician thì status = "accept"
