@@ -316,7 +316,7 @@ exports.getAppointmentsByTechnician = async (req, res) => {
     }
 
     // Kiểm tra technician có tồn tại không
-    const technician = await User.findById(technicianId).select("-password");
+    const technician = await User.findById(technicianId);
     if (!technician) {
       return res.status(404).json({
         message: "Không tìm thấy technician",
@@ -377,6 +377,7 @@ exports.createAppointment = async (req, res) => {
       record_id,
       vehicle_id,
       center_id,
+      assigned, // Optional: customer có thể tự chọn technician ngay khi tạo
     } = req.body;
     const userId = req._id?.toString();
 
@@ -426,6 +427,24 @@ exports.createAppointment = async (req, res) => {
       });
     }
 
+    // Validation technician nếu được cung cấp
+    if (assigned) {
+      const technician = await User.findById(assigned);
+      if (!technician) {
+        return res.status(404).json({
+          message: "Không tìm thấy technician",
+          success: false,
+        });
+      }
+      // Kiểm tra role của technician
+      if (technician.role !== "technician") {
+        return res.status(400).json({
+          message: "User được gán không phải là technician",
+          success: false,
+        });
+      }
+    }
+
     const appointment = new Appointment({
       appoinment_date: new Date(appoinment_date),
       appoinment_time,
@@ -435,7 +454,9 @@ exports.createAppointment = async (req, res) => {
       record_id,
       vehicle_id,
       center_id,
-      status: "pending",
+      status: assigned ? "accept" : "pending", // Nếu customer chọn technician thì status = "accept"
+      assigned_by: assigned ? userId : null, // Customer tự gán technician
+      assigned: assigned || null, // Customer tự chọn technician
     });
 
     await appointment.save();
@@ -448,7 +469,9 @@ exports.createAppointment = async (req, res) => {
       .populate("assigned", "username fullName email phone role");
 
     return res.status(201).json({
-      message: "Tạo appointment thành công",
+      message: assigned
+        ? "Tạo appointment thành công và đã chọn technician"
+        : "Tạo appointment thành công",
       success: true,
       data: populatedAppointment,
     });

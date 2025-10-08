@@ -202,9 +202,13 @@ router.get(
  *                 type: string
  *                 example: "68e0f04908abb1b3a1334e54"
  *                 description: ID của service center
+ *               assigned:
+ *                 type: string
+ *                 example: "68e0f04908abb1b3a1334e55"
+ *                 description: ID của technician (optional - customer có thể tự chọn technician ngay khi tạo)
  *     responses:
  *       201:
- *         description: Tạo appointment thành công
+ *         description: Tạo appointment thành công (nếu có assigned thì customer đã chọn technician và status = "accept")
  *         content:
  *           application/json:
  *             schema:
@@ -245,11 +249,11 @@ router.get(
  *                       type: string
  *                       format: date-time
  *       400:
- *         description: Thiếu thông tin bắt buộc
+ *         description: Thiếu thông tin bắt buộc hoặc user được gán không phải là technician
  *       401:
  *         description: Unauthorized
  *       404:
- *         description: Không tìm thấy user, vehicle hoặc service center
+ *         description: Không tìm thấy user, vehicle, service center hoặc technician
  *       500:
  *         description: Lỗi server
  */
