@@ -1,30 +1,27 @@
-const mongoose = require('mongoose')
-const schema = mongoose.Schema
-const serviceCenterSchema = new schema({
+const mongoose = require("mongoose");
+const schema = mongoose.Schema;
+const serviceCenterSchema = new schema(
+  {
     center_name: {
-        type: String,
-        required: true
+      type: String,
+      required: true,
     },
     address: {
-        type: String,
-
-    },
-    email: {
-        type: String
+      type: String,
     },
     user_id: {
-        type: mongoose.Types.ObjectId,
-        ref: "User",
+      type: mongoose.Types.ObjectId,
+      ref: "User",
 
     },
     phone: {
-        type: String
+      type: String
     },
     is_active: {
-        type: Boolean,
-        default: true
+      type: Boolean,
+      default: true
     }
 
-}, { timestamps: true })
+  }, { timestamps: true })
 const serviceCenter = mongoose.model("ServiceCenter", serviceCenterSchema);
-module.exports = serviceCenter
+module.exports = serviceCenter;

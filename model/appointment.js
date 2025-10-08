@@ -25,11 +25,6 @@ const appointmentSchema = new schema(
       ref: "User",
       required: true,
     },
-    record_id: {
-      type: mongoose.Types.ObjectId,
-      ref: "ServiceRecord",
-      required: true,
-    },
     vehicle_id: {
       type: mongoose.Types.ObjectId,
       ref: "Vehicle",
@@ -40,10 +35,14 @@ const appointmentSchema = new schema(
       ref: "ServiceCenter",
       required: true,
     },
-    assigned_schedule_id: {
+    assigned_by: {
       type: mongoose.Types.ObjectId,
-      ref: "AssignSchedule",
-      unique: true,
+      ref: "User",
+      required: false,
+    },
+    assigned: {
+      type: mongoose.Types.ObjectId,
+      ref: "User",
       required: false,
     },
   },
