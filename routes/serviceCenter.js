@@ -1,95 +1,21 @@
-const express = require("express");
-const router = express.Router();
 const serviceCenter = require("../controller/ServiceCenterController");
+var express = require("express");
+var router = express.Router();
 const auth = require("../middlewares/auth");
 
 /**
  * @swagger
  * tags:
- *   name: ServiceCenters
- *   description: Quản lý service centers
+ *   name: Service Center
+ *   description: API quản lý trung tâm dịch vụ và lịch làm việc
  */
 
 /**
  * @swagger
- * /api/service-centers:
- *   get:
- *     summary: Lấy danh sách service centers
- *     tags: [ServiceCenters]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: query
- *         name: page
- *         schema:
- *           type: integer
- *           default: 1
- *         description: Số trang
- *       - in: query
- *         name: limit
- *         schema:
- *           type: integer
- *           default: 10
- *         description: Số items per page
- *       - in: query
- *         name: search
- *         schema:
- *           type: string
- *         description: Tìm kiếm theo tên, địa chỉ
- *       - in: query
- *         name: is_active
- *         schema:
- *           type: string
- *           enum: [true, false, all]
- *           default: true
- *         description: Lọc theo trạng thái hoạt động
- *     responses:
- *       200:
- *         description: Lấy danh sách service centers thành công
- *       401:
- *         description: Unauthorized
- *       500:
- *         description: Server error
- */
-router.get("/", auth.authMiddleWare, serviceCenter.getAllServiceCenters);
-
-/**
- * @swagger
- * /api/service-centers/{centerId}:
- *   get:
- *     summary: Lấy thông tin service center theo ID
- *     tags: [ServiceCenters]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: centerId
- *         required: true
- *         schema:
- *           type: string
- *         description: Service Center ID
- *     responses:
- *       200:
- *         description: Lấy thông tin service center thành công
- *       404:
- *         description: Service center không tìm thấy
- *       401:
- *         description: Unauthorized
- *       500:
- *         description: Server error
- */
-router.get(
-  "/:centerId",
-  auth.authMiddleWare,
-  serviceCenter.getServiceCenterById
-);
-
-/**
- * @swagger
- * /api/service-centers:
+ * /api/service-center/create:
  *   post:
- *     summary: Tạo service center mới
- *     tags: [ServiceCenters]
+ *     summary: Tạo trung tâm dịch vụ mới
+ *     tags: [Service Center]
  *     security:
  *       - bearerAuth: []
  *     requestBody:
@@ -100,82 +26,160 @@ router.get(
  *             type: object
  *             required:
  *               - center_name
- *               - user_id
+ *               - address
+ *               - phone
+ *               - email
  *             properties:
  *               center_name:
  *                 type: string
- *                 example: "Trung tâm dịch vụ Hà Nội"
+ *                 example: "EV Hà Nội"
  *               address:
  *                 type: string
- *                 example: "123 Đường ABC, Quận XYZ, Hà Nội"
- *               user_id:
+ *                 example: "123 Nguyễn Văn Cừ, Long Biên, Hà Nội"
+ *               phone:
  *                 type: string
- *                 example: "60f7b3b3b3b3b3b3b3b3b3b3"
+ *                 example: "0987654321"
+ *               email:
+ *                 type: string
+ *                 example: "evcenter@gmail.com"
+ *               is_active:
+ *                 type: boolean
+ *                 example: true
  *     responses:
  *       201:
- *         description: Tạo service center thành công
- *       400:
- *         description: Thiếu thông tin bắt buộc hoặc tên đã tồn tại
+ *         description: Tạo Service Center thành công
  *       401:
- *         description: Unauthorized
- *       404:
- *         description: User không tìm thấy
+ *         description: Không có quyền truy cập
  *       500:
- *         description: Server error
+ *         description: Lỗi server
  */
-router.post("/", auth.authMiddleWare, serviceCenter.createServiceCenter);
+router.post(
+  "/create",
+  auth.authMiddleWare,
+  auth.requireRole("admin", "staff"),
+  serviceCenter.createServiceCenter
+);
 
 /**
  * @swagger
- * /api/service-centers/{centerId}:
- *   put:
- *     summary: Cập nhật service center (bao gồm deactivate/reactivate)
- *     tags: [ServiceCenters]
+ * /api/service-center/schedule/create/{id}:
+ *   post:
+ *     summary: Tạo lịch làm việc cho trung tâm
+ *     tags: [Service Center]
  *     security:
  *       - bearerAuth: []
  *     parameters:
- *       - in: path
- *         name: centerId
+ *       - name: id
+ *         in: path
  *         required: true
  *         schema:
  *           type: string
- *         description: Service Center ID
+ *         description: ID của trung tâm cần tạo lịch làm việc
  *     requestBody:
  *       required: true
  *       content:
  *         application/json:
  *           schema:
  *             type: object
+ *             required:
+ *               - day_of_week
+ *               - open_time
+ *               - close_time
  *             properties:
- *               center_name:
+ *               day_of_week:
  *                 type: string
- *                 example: "Trung tâm dịch vụ Hà Nội Updated"
- *               address:
+ *                 example: "Monday"
+ *               open_time:
  *                 type: string
- *                 example: "456 Đường XYZ, Quận ABC, Hà Nội"
- *               user_id:
+ *                 example: "08:00"
+ *               close_time:
  *                 type: string
- *                 example: "60f7b3b3b3b3b3b3b3b3b3b4"
- *               is_active:
+ *                 example: "17:00"
+ *               is_close:
  *                 type: boolean
- *                 example: true
- *                 description: "true = hoạt động, false = deactivate (soft delete)"
+ *                 example: false
  *     responses:
- *       200:
- *         description: Cập nhật service center thành công
- *       400:
- *         description: Tên service center đã tồn tại
- *       401:
- *         description: Unauthorized
+ *       202:
+ *         description: Tạo lịch làm việc trung tâm thành công
  *       404:
- *         description: Service center hoặc user không tìm thấy
+ *         description: Không tìm thấy trung tâm
  *       500:
- *         description: Server error
+ *         description: Lỗi server
  */
-router.put(
-  "/:centerId",
+router.post(
+  "/schedule/create/:id",
   auth.authMiddleWare,
-  serviceCenter.updateServiceCenter
+  auth.requireRole("admin", "technician", "staff"),
+  serviceCenter.createServiceCenterSchedule
+);
+
+/**
+ * @swagger
+ * /api/service-center/get:
+ *   get:
+ *     summary: Lấy danh sách tất cả trung tâm và giờ làm việc
+ *     tags: [Service Center]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       202:
+ *         description: Lấy danh sách trung tâm và giờ làm việc thành công
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: "Danh sách trung tâm và giờ làm việc"
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       _id:
+ *                         type: string
+ *                         example: "670feebd8b5326fbe3a9b1a7"
+ *                       center_name:
+ *                         type: string
+ *                         example: "EV Hà Nội"
+ *                       address:
+ *                         type: string
+ *                         example: "123 Nguyễn Văn Cừ, Long Biên, Hà Nội"
+ *                       phone:
+ *                         type: string
+ *                         example: "0987654321"
+ *                       email:
+ *                         type: string
+ *                         example: "evcenter@gmail.com"
+ *                       working_hours:
+ *                         type: array
+ *                         items:
+ *                           type: object
+ *                           properties:
+ *                             day_of_week:
+ *                               type: string
+ *                               example: "Monday"
+ *                             open_time:
+ *                               type: string
+ *                               example: "08:00"
+ *                             close_time:
+ *                               type: string
+ *                               example: "17:00"
+ *                             is_close:
+ *                               type: boolean
+ *                               example: false
+ *       500:
+ *         description: Lỗi server khi lấy danh sách trung tâm
+ */
+router.get(
+  "/get",
+  auth.authMiddleWare,
+  auth.requireRole("customer", "staff", "technician", "admin"),
+  serviceCenter.getAllServiceCenters
 );
 
 module.exports = router;
