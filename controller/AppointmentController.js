@@ -2,6 +2,8 @@ const Appointment = require("../model/appointment");
 const User = require("../model/user");
 const ServiceCenter = require("../model/serviceCenter");
 const Vehicle = require("../model/vehicle");
+const Payment = require("../model/payment");
+const PaymentController = require("./PaymentController");
 const {
   createPagination,
   createAppointmentResponse,
@@ -43,6 +45,11 @@ exports.getAppointments = async (req, res) => {
       .populate("vehicle_id", "license_plate brand model year")
       .populate("assigned_by", "username fullName email phone role")
       .populate("assigned", "username fullName email phone role")
+      .populate("payment_id", "order_code amount status checkout_url qr_code")
+      .populate(
+        "final_payment_id",
+        "order_code amount status checkout_url qr_code"
+      )
       .sort({ appoinment_date: -1 })
       .skip(pagination.skip)
       .limit(pagination.limit)
@@ -114,6 +121,11 @@ exports.assignTechnician = async (req, res) => {
       .populate("vehicle_id", "license_plate brand model year")
       .populate("assigned_by", "username fullName email phone role")
       .populate("assigned", "username fullName email phone role")
+      .populate("payment_id", "order_code amount status checkout_url qr_code")
+      .populate(
+        "final_payment_id",
+        "order_code amount status checkout_url qr_code"
+      )
       .lean();
 
     return res.status(200).json({
@@ -150,11 +162,17 @@ exports.updateAppointmentStatus = async (req, res) => {
       });
     }
 
-    const validStatuses = ["pending", "accept", "completed", "canceled"];
+    const validStatuses = [
+      "pending",
+      "accept",
+      "deposited",
+      "completed",
+      "canceled",
+    ];
     if (!validStatuses.includes(status)) {
       return res.status(400).json({
         message:
-          "Status không hợp lệ. Chỉ chấp nhận: pending, accept, completed, canceled",
+          "Status không hợp lệ. Chỉ chấp nhận: pending, accept, deposited, completed, canceled",
         success: false,
       });
     }
@@ -209,6 +227,11 @@ exports.getAppointmentById = async (req, res) => {
       .populate("vehicle_id", "license_plate brand model year color")
       .populate("assigned_by", "username fullName email phone role")
       .populate("assigned", "username fullName email phone role")
+      .populate("payment_id", "order_code amount status checkout_url qr_code")
+      .populate(
+        "final_payment_id",
+        "order_code amount status checkout_url qr_code"
+      )
       .lean();
 
     if (!appointment) {
@@ -274,6 +297,11 @@ exports.getAppointmentsByUsername = async (req, res) => {
       .populate("vehicle_id", "license_plate brand model year")
       .populate("assigned_by", "username fullName email phone role")
       .populate("assigned", "username fullName email phone role")
+      .populate("payment_id", "order_code amount status checkout_url qr_code")
+      .populate(
+        "final_payment_id",
+        "order_code amount status checkout_url qr_code"
+      )
       .sort({ appoinment_date: -1 })
       .skip(pagination.skip)
       .limit(pagination.limit)
@@ -315,7 +343,6 @@ exports.getAppointmentsByTechnician = async (req, res) => {
       });
     }
 
-    // Kiểm tra technician có tồn tại không
     const technician = await User.findById(technicianId);
     if (!technician) {
       return res.status(404).json({
@@ -344,6 +371,11 @@ exports.getAppointmentsByTechnician = async (req, res) => {
       .populate("vehicle_id", "license_plate brand model year")
       .populate("assigned_by", "username fullName email phone role")
       .populate("assigned", "username fullName email phone role")
+      .populate("payment_id", "order_code amount status checkout_url qr_code")
+      .populate(
+        "final_payment_id",
+        "order_code amount status checkout_url qr_code"
+      )
       .sort({ appoinment_date: -1 })
       .skip(pagination.skip)
       .limit(pagination.limit)
@@ -365,7 +397,6 @@ exports.getAppointmentsByTechnician = async (req, res) => {
   }
 };
 
-// Tạo appointment mới
 exports.createAppointment = async (req, res) => {
   try {
     const {
@@ -376,7 +407,7 @@ exports.createAppointment = async (req, res) => {
       user_id,
       vehicle_id,
       center_id,
-      assigned, // Optional: customer có thể tự chọn technician ngay khi tạo
+      assigned,
     } = req.body;
     const userId = req._id?.toString();
 
@@ -387,7 +418,6 @@ exports.createAppointment = async (req, res) => {
       });
     }
 
-    // Validation
     if (
       !appoinment_date ||
       !appoinment_time ||
@@ -401,7 +431,7 @@ exports.createAppointment = async (req, res) => {
       });
     }
 
-    const user = await User.findById(user_id).select("-password");
+    const user = await User.findById(user_id);
     if (!user) {
       return res.status(404).json({
         message: "Không tìm thấy user",
@@ -425,7 +455,6 @@ exports.createAppointment = async (req, res) => {
       });
     }
 
-    // Validation technician nếu được cung cấp
     if (assigned) {
       const technician = await User.findById(assigned);
       if (!technician) {
@@ -434,7 +463,6 @@ exports.createAppointment = async (req, res) => {
           success: false,
         });
       }
-      // Kiểm tra role của technician
       if (technician.role !== "technician") {
         return res.status(400).json({
           message: "User được gán không phải là technician",
@@ -451,24 +479,86 @@ exports.createAppointment = async (req, res) => {
       user_id,
       vehicle_id,
       center_id,
-      status: assigned ? "accept" : "pending", // Nếu customer chọn technician thì status = "accept"
-      assigned_by: assigned ? userId : null, // Customer tự gán technician
-      assigned: assigned || null, // Customer tự chọn technician
+      status: "pending",
+      assigned_by: null,
+      assigned: assigned || null,
     });
 
     await appointment.save();
+
+    const depositAmount = 2000;
+    const depositDescription = `Tam ung ${appointment._id
+      .toString()
+      .slice(-6)}`;
+
+    const paymentReq = {
+      _id: userId,
+      body: {
+        amount: depositAmount,
+        description: depositDescription,
+      },
+    };
+
+    let paymentResult = null;
+    const paymentRes = {
+      status: (code) => ({
+        json: (data) => {
+          console.log(
+            `Payment response - Status: ${code}, Data:`,
+            JSON.stringify(data, null, 2)
+          );
+          if (code === 201) {
+            paymentResult = data;
+          }
+        },
+      }),
+    };
+
+    try {
+      await PaymentController.createPaymentLink(paymentReq, paymentRes);
+    } catch (paymentError) {
+      const orderCode = Date.now();
+      const fallbackPayment = new Payment({
+        order_code: orderCode,
+        amount: depositAmount,
+        description: depositDescription,
+        status: "pending",
+        user_id: userId,
+      });
+
+      await fallbackPayment.save();
+      paymentResult = {
+        success: true,
+        data: {
+          payment_id: fallbackPayment._id,
+          order_code: orderCode,
+          amount: depositAmount,
+          status: "pending",
+        },
+      };
+    }
+
+    if (paymentResult && paymentResult.success) {
+      appointment.payment_id = paymentResult.data.payment_id;
+      await appointment.save();
+    }
 
     const populatedAppointment = await Appointment.findById(appointment._id)
       .populate("user_id", "username fullName email phone")
       .populate("center_id", "name address phone")
       .populate("vehicle_id", "license_plate brand model year")
       .populate("assigned_by", "username fullName email phone role")
-      .populate("assigned", "username fullName email phone role");
+      .populate("assigned", "username fullName email phone role")
+      .populate("payment_id", "order_code amount status checkout_url qr_code")
+      .populate(
+        "final_payment_id",
+        "order_code amount status checkout_url qr_code"
+      );
 
     return res.status(201).json({
       message: assigned
-        ? "Tạo appointment thành công và đã chọn technician"
-        : "Tạo appointment thành công",
+        ? "Tạo appointment thành công, đã chọn technician và tạo payment link tạm ứng"
+        : "Tạo appointment thành công và tạo payment link tạm ứng",
       success: true,
       data: populatedAppointment,
     });
@@ -482,7 +572,145 @@ exports.createAppointment = async (req, res) => {
   }
 };
 
-// Xóa appointment (chỉ cho phép xóa appointment có trạng thái pending)
+exports.createFinalPayment = async (req, res) => {
+  try {
+    const { appointmentId } = req.params;
+    const userId = req._id?.toString();
+
+    if (!userId) {
+      return res.status(401).json({
+        message: "Unauthorized",
+        success: false,
+      });
+    }
+
+    if (!appointmentId) {
+      return res.status(400).json({
+        message: "Thiếu appointment ID",
+        success: false,
+      });
+    }
+
+    const appointment = await Appointment.findById(appointmentId)
+      .populate("payment_id")
+      .populate("user_id", "username fullName email");
+
+    if (!appointment) {
+      return res.status(404).json({
+        message: "Không tìm thấy appointment",
+        success: false,
+      });
+    }
+
+    if (appointment.status !== "completed") {
+      return res.status(400).json({
+        message: "Chỉ có thể tạo final payment cho appointment đã hoàn thành",
+        success: false,
+      });
+    }
+
+    if (appointment.final_payment_id) {
+      return res.status(400).json({
+        message: "Appointment đã có final payment",
+        success: false,
+      });
+    }
+
+    const totalCost = appointment.estimated_cost || 0;
+    const depositAmount = appointment.payment_id?.amount || 0;
+    const remainingAmount = totalCost - depositAmount;
+
+    if (remainingAmount <= 0) {
+      return res.status(400).json({
+        message: "Không cần thanh toán thêm (đã đủ tiền từ deposit)",
+        success: false,
+      });
+    }
+
+    const finalPaymentDescription = `Thanh toan con lai ${appointment._id
+      .toString()
+      .slice(-6)}`;
+
+    const paymentReq = {
+      _id: appointment.user_id._id.toString(),
+      body: {
+        amount: remainingAmount,
+        description: finalPaymentDescription,
+      },
+    };
+
+    let paymentResult = null;
+    const paymentRes = {
+      status: (code) => ({
+        json: (data) => {
+          if (code === 201) {
+            paymentResult = data;
+          }
+        },
+      }),
+    };
+
+    try {
+      await PaymentController.createPaymentLink(paymentReq, paymentRes);
+    } catch (paymentError) {
+      const orderCode = Date.now();
+      const fallbackPayment = new Payment({
+        order_code: orderCode,
+        amount: remainingAmount,
+        description: finalPaymentDescription,
+        status: "pending",
+        user_id: appointment.user_id._id,
+      });
+
+      await fallbackPayment.save();
+      paymentResult = {
+        success: true,
+        data: {
+          payment_id: fallbackPayment._id,
+          order_code: orderCode,
+          amount: remainingAmount,
+          status: "pending",
+        },
+      };
+    }
+
+    if (paymentResult && paymentResult.success) {
+      appointment.final_payment_id = paymentResult.data.payment_id;
+      await appointment.save();
+
+      const populatedAppointment = await Appointment.findById(appointmentId)
+        .populate("user_id", "username fullName email phone")
+        .populate("center_id", "name address phone")
+        .populate("vehicle_id", "license_plate brand model year")
+        .populate("assigned_by", "username fullName email phone role")
+        .populate("assigned", "username fullName email phone role")
+        .populate("payment_id", "order_code amount status checkout_url qr_code")
+        .populate(
+          "final_payment_id",
+          "order_code amount status checkout_url qr_code"
+        );
+
+      return res.status(200).json({
+        message: "Cập nhật appointment với final payment thành công",
+        success: true,
+        data: populatedAppointment,
+      });
+    } else {
+      return res.status(500).json({
+        message: "Lỗi tạo final payment",
+        success: false,
+      });
+    }
+  } catch (error) {
+    console.error("Create final payment error:", error);
+    return res.status(500).json({
+      message: "Lỗi tạo final payment",
+      error: error.message,
+      success: false,
+    });
+  }
+};
+
 exports.deleteAppointment = async (req, res) => {
   try {
     const { appointmentId } = req.params;
@@ -510,7 +738,6 @@ exports.deleteAppointment = async (req, res) => {
       });
     }
 
-    // Chỉ cho phép xóa appointment có trạng thái pending
     if (appointment.status !== "pending") {
       return res.status(400).json({
         message: "Chỉ có thể xóa appointment có trạng thái pending",

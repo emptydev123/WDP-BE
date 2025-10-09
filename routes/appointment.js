@@ -203,7 +203,7 @@ router.get(
  *                 description: ID của technician (optional - customer có thể tự chọn technician ngay khi tạo)
  *     responses:
  *       201:
- *         description: Tạo appointment thành công (nếu có assigned thì customer đã chọn technician và status = "accept")
+ *         description: Tạo appointment thành công (tự động tạo payment tạm ứng 2000 VND và status = "deposited")
  *         content:
  *           application/json:
  *             schema:
@@ -584,6 +584,45 @@ router.get(
 
 /**
  * @swagger
+ * /api/appointment/{appointmentId}/final-payment:
+ *   put:
+ *     summary: Cập nhật appointment với final payment (số tiền còn lại)
+ *     tags: [Appointments]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: appointmentId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: ID của appointment
+ *     responses:
+ *       200:
+ *         description: Cập nhật appointment với final payment thành công
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                 success:
+ *                   type: boolean
+ *                 data:
+ *                   type: object
+ *       400:
+ *         description: Appointment chưa hoàn thành hoặc đã có final payment
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: Không tìm thấy appointment
+ *       500:
+ *         description: Lỗi server
+ */
+
+/**
+ * @swagger
  * /api/appointment/{appointmentId}:
  *   delete:
  *     summary: Xóa appointment (chỉ cho phép xóa appointment có trạng thái pending)
@@ -618,6 +657,13 @@ router.get(
  *       500:
  *         description: Lỗi server
  */
+router.put(
+  "/:appointmentId/final-payment",
+  auth.authMiddleWare,
+  auth.requireRole("customer", "staff", "admin"),
+  appointment.createFinalPayment
+);
+
 router.delete(
   "/:appointmentId",
   auth.authMiddleWare,

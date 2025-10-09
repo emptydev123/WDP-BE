@@ -27,7 +27,14 @@ const paymentSchema = new schema(
       ref: "User",
       required: true,
     },
-
+    checkout_url: {
+      type: String,
+      required: false,
+    },
+    qr_code: {
+      type: String,
+      required: false,
+    },
   },
   { timestamps: true }
 );
