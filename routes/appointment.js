@@ -584,9 +584,9 @@ router.get(
 
 /**
  * @swagger
- * /api/appointment/{appointmentId}/create-final-payment:
- *   post:
- *     summary: Tạo payment thứ 2 cho số tiền còn lại
+ * /api/appointment/{appointmentId}/final-payment:
+ *   put:
+ *     summary: Cập nhật appointment với final payment (số tiền còn lại)
  *     tags: [Appointments]
  *     security:
  *       - bearerAuth: []
@@ -598,8 +598,8 @@ router.get(
  *           type: string
  *         description: ID của appointment
  *     responses:
- *       201:
- *         description: Tạo final payment thành công
+ *       200:
+ *         description: Cập nhật appointment với final payment thành công
  *         content:
  *           application/json:
  *             schema:
@@ -657,8 +657,8 @@ router.get(
  *       500:
  *         description: Lỗi server
  */
-router.post(
-  "/:appointmentId/create-final-payment",
+router.put(
+  "/:appointmentId/final-payment",
   auth.authMiddleWare,
   auth.requireRole("customer", "staff", "admin"),
   appointment.createFinalPayment

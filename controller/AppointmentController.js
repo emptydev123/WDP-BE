@@ -690,8 +690,8 @@ exports.createFinalPayment = async (req, res) => {
           "order_code amount status checkout_url qr_code"
         );
 
-      return res.status(201).json({
-        message: "Tạo final payment thành công",
+      return res.status(200).json({
+        message: "Cập nhật appointment với final payment thành công",
         success: true,
         data: populatedAppointment,
       });
