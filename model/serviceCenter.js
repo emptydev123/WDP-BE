@@ -12,14 +12,16 @@ const serviceCenterSchema = new schema(
     user_id: {
       type: mongoose.Types.ObjectId,
       ref: "User",
-      required: true,
+
+    },
+    phone: {
+      type: String
     },
     is_active: {
       type: Boolean,
-      default: true,
-    },
-  },
-  { timestamps: true }
-);
+      default: true
+    }
+
+  }, { timestamps: true })
 const serviceCenter = mongoose.model("ServiceCenter", serviceCenterSchema);
 module.exports = serviceCenter;

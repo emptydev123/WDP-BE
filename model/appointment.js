@@ -11,7 +11,7 @@ const appointmentSchema = new schema(
     },
     status: {
       type: String,
-      enum: ["pending", "accept", "completed", "canceled"],
+      enum: ["pending", "accepted", "deposited", "completed", "paid", "canceled"],
       default: "pending",
     },
     notes: {
@@ -43,6 +43,16 @@ const appointmentSchema = new schema(
     assigned: {
       type: mongoose.Types.ObjectId,
       ref: "User",
+      required: false,
+    },
+    payment_id: {
+      type: mongoose.Types.ObjectId,
+      ref: "Payment",
+      required: false,
+    },
+    final_payment_id: {
+      type: mongoose.Types.ObjectId,
+      ref: "Payment",
       required: false,
     },
   },
