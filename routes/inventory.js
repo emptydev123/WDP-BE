@@ -8,7 +8,6 @@ const {
   createInventory,
   updateInventory,
   deleteInventory,
-  getLowStockInventory,
 } = require("../controller/InventoryController");
 
 /**
@@ -76,57 +75,7 @@ const {
  */
 router.get("/", auth.authMiddleWare, getAllInventory);
 
-/**
- * @swagger
- * /api/inventory/low-stock:
- *   get:
- *     summary: Lấy danh sách inventory tồn kho thấp
- *     tags: [Inventory]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: query
- *         name: page
- *         schema:
- *           type: integer
- *           default: 1
- *         description: Page number
- *       - in: query
- *         name: limit
- *         schema:
- *           type: integer
- *           default: 10
- *         description: Items per page
- *       - in: query
- *         name: center_id
- *         schema:
- *           type: string
- *         description: Filter by service center
- *     responses:
- *       200:
- *         description: Success
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   type: string
- *                 success:
- *                   type: boolean
- *                 data:
- *                   type: object
- *                   properties:
- *                     items:
- *                       type: array
- *                       items:
- *                         type: object
- *                     pagination:
- *                       type: object
- *       500:
- *         description: Server error
- */
-router.get("/low-stock", auth.authMiddleWare, getLowStockInventory);
+// Removed low-stock API - use GET /api/inventory?low_stock=true instead
 
 // Removed demand-suggestion API as requested
 
@@ -316,58 +265,5 @@ router.put("/:inventoryId", auth.authMiddleWare, updateInventory);
  *         description: Server error
  */
 router.delete("/:inventoryId", auth.authMiddleWare, deleteInventory);
-
-// Removed minimum-stock update API (covered by update inventory)
-
-/**
- * @swagger
- * /api/inventory/low-stock:
- *   get:
- *     summary: Lấy danh sách inventory tồn kho thấp
- *     tags: [Inventory]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: query
- *         name: page
- *         schema:
- *           type: integer
- *           default: 1
- *         description: Page number
- *       - in: query
- *         name: limit
- *         schema:
- *           type: integer
- *           default: 10
- *         description: Items per page
- *       - in: query
- *         name: center_id
- *         schema:
- *           type: string
- *         description: Filter by service center
- *     responses:
- *       200:
- *         description: Success
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   type: string
- *                 success:
- *                   type: boolean
- *                 data:
- *                   type: object
- *                   properties:
- *                     items:
- *                       type: array
- *                       items:
- *                         type: object
- *                     pagination:
- *                       type: object
- *       500:
- *         description: Server error
- */
 
 module.exports = router;
