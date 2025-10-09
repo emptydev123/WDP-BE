@@ -11,7 +11,7 @@ const appointmentSchema = new schema(
     },
     status: {
       type: String,
-      enum: ["pending", "accept", "deposited", "completed", "canceled"],
+      enum: ["pending", "accepted", "deposited", "completed", "paid", "canceled"],
       default: "pending",
     },
     notes: {
