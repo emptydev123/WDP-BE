@@ -4,15 +4,23 @@ const ServiceCenter = require("../model/serviceCenter");
 const Vehicle = require("../model/vehicle");
 const Payment = require("../model/payment");
 const PaymentController = require("./PaymentController");
+const ServiceType = require("../model/serviceType");
 const {
   createPagination,
-  createAppointmentResponse,
+  createPaginatedResponse,
   validatePagination,
 } = require("../utils/pagination");
 
 exports.getAppointments = async (req, res) => {
   try {
-    const { page = 1, limit = 10, status, service_center_id } = req.query;
+    const {
+      page = 1,
+      limit = 10,
+      status,
+      service_center_id,
+      technician_id,
+      customer_id,
+    } = req.query;
     const userId = req._id?.toString();
 
     if (!userId) {
@@ -34,6 +42,12 @@ exports.getAppointments = async (req, res) => {
     if (service_center_id) {
       query.center_id = service_center_id;
     }
+    if (technician_id) {
+      query.assigned = technician_id;
+    }
+    if (customer_id) {
+      query.user_id = customer_id;
+    }
 
     const total = await Appointment.countDocuments(query);
 
@@ -50,12 +64,20 @@ exports.getAppointments = async (req, res) => {
         "final_payment_id",
         "order_code amount status checkout_url qr_code"
       )
+      .populate(
+        "service_type_id",
+        "service_name description base_price estimated_duration"
+      )
       .sort({ appoinment_date: -1 })
       .skip(pagination.skip)
       .limit(pagination.limit)
       .lean();
 
-    const response = createAppointmentResponse(appointments, pagination);
+    const response = createPaginatedResponse(
+      appointments,
+      pagination,
+      "Lấy danh sách appointments thành công"
+    );
     return res.status(200).json(response);
   } catch (error) {
     console.error("Get appointments error:", error);
@@ -109,7 +131,6 @@ exports.assignTechnician = async (req, res) => {
       });
     }
 
-    // Cập nhật appointment với thông tin assignment
     appointment.assigned_by = assignedBy;
     appointment.assigned = technician_id;
     appointment.status = "accept";
@@ -126,6 +147,10 @@ exports.assignTechnician = async (req, res) => {
         "final_payment_id",
         "order_code amount status checkout_url qr_code"
       )
+      .populate(
+        "service_type_id",
+        "service_name description base_price estimated_duration"
+      )
       .lean();
 
     return res.status(200).json({
@@ -137,6 +162,68 @@ exports.assignTechnician = async (req, res) => {
     console.error("Assign technician error:", error);
     return res.status(500).json({
       message: "Lỗi assign technician",
+      error: error.message,
+      success: false,
+    });
+  }
+};
+
+// Lấy appointments của user hiện tại đang đăng nhập
+exports.getMyAppointments = async (req, res) => {
+  try {
+    const { page = 1, limit = 10, status } = req.query;
+    const userId = req._id?.toString();
+
+    if (!userId) {
+      return res.status(401).json({
+        message: "Unauthorized",
+        success: false,
+      });
+    }
+
+    const { page: validatedPage, limit: validatedLimit } = validatePagination(
+      page,
+      limit
+    );
+
+    const query = { user_id: userId };
+    if (status) {
+      query.status = status;
+    }
+
+    const total = await Appointment.countDocuments(query);
+    const pagination = createPagination(validatedPage, validatedLimit, total);
+
+    const appointments = await Appointment.find(query)
+      .populate("user_id", "username fullName email phone")
+      .populate("center_id", "name address phone")
+      .populate("vehicle_id", "license_plate brand model year")
+      .populate("assigned_by", "username fullName email phone role")
+      .populate("assigned", "username fullName email phone role")
+      .populate("payment_id", "order_code amount status checkout_url qr_code")
+      .populate(
+        "final_payment_id",
+        "order_code amount status checkout_url qr_code"
+      )
+      .populate(
+        "service_type_id",
+        "service_name description base_price estimated_duration"
+      )
+      .sort({ appoinment_date: -1 })
+      .skip(pagination.skip)
+      .limit(pagination.limit)
+      .lean();
+
+    const response = createPaginatedResponse(
+      appointments,
+      pagination,
+      "Lấy danh sách appointments của tôi thành công"
+    );
+    return res.status(200).json(response);
+  } catch (error) {
+    console.error("Get my appointments error:", error);
+    return res.status(500).json({
+      message: "Lỗi lấy danh sách appointments",
       error: error.message,
       success: false,
     });
@@ -167,17 +254,20 @@ exports.updateAppointmentStatus = async (req, res) => {
       "accept",
       "deposited",
       "completed",
+      "paid",
       "canceled",
     ];
     if (!validStatuses.includes(status)) {
       return res.status(400).json({
         message:
-          "Status không hợp lệ. Chỉ chấp nhận: pending, accept, deposited, completed, canceled",
+          "Status không hợp lệ. Chỉ chấp nhận: pending, accept, deposited, completed, paid, canceled",
         success: false,
       });
     }
 
-    const appointment = await Appointment.findById(appointment_id);
+    const appointment = await Appointment.findById(appointment_id).populate(
+      "payment_id"
+    );
     if (!appointment) {
       return res.status(404).json({
         message: "Không tìm thấy appointment",
@@ -185,7 +275,21 @@ exports.updateAppointmentStatus = async (req, res) => {
       });
     }
 
+    const oldStatus = appointment.status;
     appointment.status = status;
+
+    if (oldStatus === "pending" && status === "deposited") {
+      const depositAmount = appointment.payment_id?.amount || 2000;
+      appointment.estimated_cost = Math.max(
+        0,
+        appointment.estimated_cost - depositAmount
+      );
+    }
+
+    if (status === "paid") {
+      appointment.estimated_cost = 0;
+    }
+
     await appointment.save();
 
     const updatedAppointment = await Appointment.findById(appointment_id)
@@ -232,6 +336,10 @@ exports.getAppointmentById = async (req, res) => {
         "final_payment_id",
         "order_code amount status checkout_url qr_code"
       )
+      .populate(
+        "service_type_id",
+        "service_name description base_price estimated_duration"
+      )
       .lean();
 
     if (!appointment) {
@@ -256,146 +364,8 @@ exports.getAppointmentById = async (req, res) => {
   }
 };
 
-exports.getAppointmentsByUsername = async (req, res) => {
-  try {
-    const { username } = req.params;
-    const { page = 1, limit = 10, status } = req.query;
-    const userId = req._id?.toString();
-
-    if (!userId) {
-      return res.status(401).json({
-        message: "Unauthorized",
-        success: false,
-      });
-    }
-
-    const user = await User.findOne({ username: username });
-    if (!user) {
-      return res.status(404).json({
-        message: "Không tìm thấy user",
-        success: false,
-      });
-    }
-
-    const { page: validatedPage, limit: validatedLimit } = validatePagination(
-      page,
-      limit
-    );
-
-    const query = { user_id: user._id };
-    if (status) {
-      query.status = status;
-    }
-
-    const total = await Appointment.countDocuments(query);
-
-    const pagination = createPagination(validatedPage, validatedLimit, total);
-
-    const appointments = await Appointment.find(query)
-      .populate("user_id", "username fullName email phone")
-      .populate("center_id", "name address phone")
-      .populate("vehicle_id", "license_plate brand model year")
-      .populate("assigned_by", "username fullName email phone role")
-      .populate("assigned", "username fullName email phone role")
-      .populate("payment_id", "order_code amount status checkout_url qr_code")
-      .populate(
-        "final_payment_id",
-        "order_code amount status checkout_url qr_code"
-      )
-      .sort({ appoinment_date: -1 })
-      .skip(pagination.skip)
-      .limit(pagination.limit)
-      .lean();
-
-    const response = createAppointmentResponse(
-      appointments,
-      pagination,
-      "Lấy danh sách appointment theo username thành công"
-    );
-    return res.status(200).json(response);
-  } catch (error) {
-    console.error("Get appointments by username error:", error);
-    return res.status(500).json({
-      message: "Lỗi lấy danh sách appointment theo username",
-      error: error.message,
-      success: false,
-    });
-  }
-};
-
-exports.getAppointmentsByTechnician = async (req, res) => {
-  try {
-    const { technicianId } = req.params;
-    const { page = 1, limit = 10, status } = req.query;
-    const userId = req._id?.toString();
-
-    if (!userId) {
-      return res.status(401).json({
-        message: "Unauthorized",
-        success: false,
-      });
-    }
-
-    if (!technicianId) {
-      return res.status(400).json({
-        message: "Thiếu technician ID",
-        success: false,
-      });
-    }
-
-    const technician = await User.findById(technicianId);
-    if (!technician) {
-      return res.status(404).json({
-        message: "Không tìm thấy technician",
-        success: false,
-      });
-    }
-
-    const { page: validatedPage, limit: validatedLimit } = validatePagination(
-      page,
-      limit
-    );
-
-    const query = { assigned: technicianId };
-    if (status) {
-      query.status = status;
-    }
-
-    const total = await Appointment.countDocuments(query);
-
-    const pagination = createPagination(validatedPage, validatedLimit, total);
-
-    const appointments = await Appointment.find(query)
-      .populate("user_id", "username fullName email phone")
-      .populate("center_id", "name address phone")
-      .populate("vehicle_id", "license_plate brand model year")
-      .populate("assigned_by", "username fullName email phone role")
-      .populate("assigned", "username fullName email phone role")
-      .populate("payment_id", "order_code amount status checkout_url qr_code")
-      .populate(
-        "final_payment_id",
-        "order_code amount status checkout_url qr_code"
-      )
-      .sort({ appoinment_date: -1 })
-      .skip(pagination.skip)
-      .limit(pagination.limit)
-      .lean();
-
-    const response = createAppointmentResponse(
-      appointments,
-      pagination,
-      "Lấy danh sách appointment theo technician thành công"
-    );
-    return res.status(200).json(response);
-  } catch (error) {
-    console.error("Get appointments by technician error:", error);
-    return res.status(500).json({
-      message: "Lỗi lấy danh sách appointment theo technician",
-      error: error.message,
-      success: false,
-    });
-  }
-};
+// Removed: getAppointmentsByUsername - use GET /api/appointment?customer_id=xxx
+// Removed: getAppointmentsByTechnician - use GET /api/appointment?technician_id=xxx
 
 exports.createAppointment = async (req, res) => {
   try {
@@ -403,11 +373,11 @@ exports.createAppointment = async (req, res) => {
       appoinment_date,
       appoinment_time,
       notes,
-      estimated_cost,
       user_id,
       vehicle_id,
       center_id,
       assigned,
+      service_type_id,
     } = req.body;
     const userId = req._id?.toString();
 
@@ -423,7 +393,8 @@ exports.createAppointment = async (req, res) => {
       !appoinment_time ||
       !user_id ||
       !vehicle_id ||
-      !center_id
+      !center_id ||
+      !service_type_id
     ) {
       return res.status(400).json({
         message: "Thiếu thông tin bắt buộc",
@@ -455,6 +426,14 @@ exports.createAppointment = async (req, res) => {
       });
     }
 
+    const serviceType = await ServiceType.findById(service_type_id);
+    if (!serviceType) {
+      return res.status(404).json({
+        message: "Không tìm thấy service type",
+        success: false,
+      });
+    }
+
     if (assigned) {
       const technician = await User.findById(assigned);
       if (!technician) {
@@ -475,10 +454,11 @@ exports.createAppointment = async (req, res) => {
       appoinment_date: new Date(appoinment_date),
       appoinment_time,
       notes,
-      estimated_cost,
+      estimated_cost: serviceType.base_price || 0,
       user_id,
       vehicle_id,
       center_id,
+      service_type_id,
       status: "pending",
       assigned_by: null,
       assigned: assigned || null,
@@ -540,6 +520,8 @@ exports.createAppointment = async (req, res) => {
 
     if (paymentResult && paymentResult.success) {
       appointment.payment_id = paymentResult.data.payment_id;
+      // Chưa trừ estimated_cost ở đây
+      // estimated_cost sẽ trừ khi cập nhật status sang "deposited"
       await appointment.save();
     }
 
@@ -553,6 +535,10 @@ exports.createAppointment = async (req, res) => {
       .populate(
         "final_payment_id",
         "order_code amount status checkout_url qr_code"
+      )
+      .populate(
+        "service_type_id",
+        "service_name description base_price estimated_duration"
       );
 
     return res.status(201).json({
@@ -616,13 +602,11 @@ exports.createFinalPayment = async (req, res) => {
       });
     }
 
-    const totalCost = appointment.estimated_cost || 0;
-    const depositAmount = appointment.payment_id?.amount || 0;
-    const remainingAmount = totalCost - depositAmount;
+    const remainingAmount = appointment.estimated_cost || 0;
 
     if (remainingAmount <= 0) {
       return res.status(400).json({
-        message: "Không cần thanh toán thêm (đã đủ tiền từ deposit)",
+        message: "Không cần thanh toán thêm (đã thanh toán đủ)",
         success: false,
       });
     }

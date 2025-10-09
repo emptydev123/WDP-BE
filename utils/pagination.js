@@ -73,98 +73,8 @@ const createPaginatedResponse = (
   };
 };
 
-/**
- * Tạo pagination cho Appointment response (backward compatibility)
- * @param {Array} appointments - Array of appointments
- * @param {Object} pagination - Pagination metadata
- * @param {string} message - Success message
- * @param {boolean} success - Success status
- * @returns {Object} Formatted response
- */
-const createAppointmentResponse = (
-  appointments,
-  pagination,
-  message = "Lấy danh sách appointments thành công",
-  success = true
-) => {
-  return {
-    message,
-    success,
-    data: {
-      appointments,
-      pagination: {
-        current_page: pagination.current_page,
-        items_per_page: pagination.items_per_page,
-        total_items: pagination.total_items,
-        total_pages: pagination.total_pages,
-        has_next_page: pagination.has_next_page,
-        has_prev_page: pagination.has_prev_page,
-      },
-    },
-  };
-};
-
-/**
- * Tạo pagination cho Payment response
- * @param {Array} payments - Array of payments
- * @param {Object} pagination - Pagination metadata
- * @param {string} message - Success message
- * @param {boolean} success - Success status
- * @returns {Object} Formatted response
- */
-const createPaymentResponse = (
-  payments,
-  pagination,
-  message = "Lấy danh sách thanh toán thành công",
-  success = true
-) => {
-  return {
-    message,
-    success,
-    data: {
-      payments,
-      pagination: {
-        current_page: pagination.current_page,
-        items_per_page: pagination.items_per_page,
-        total_items: pagination.total_items,
-        total_pages: pagination.total_pages,
-        has_next_page: pagination.has_next_page,
-        has_prev_page: pagination.has_prev_page,
-      },
-    },
-  };
-};
-
-/**
- * Tạo pagination cho Transaction response
- * @param {Array} transactions - Array of transactions
- * @param {Object} pagination - Pagination metadata
- * @param {string} message - Success message
- * @param {boolean} success - Success status
- * @returns {Object} Formatted response
- */
-const createTransactionResponse = (
-  transactions,
-  pagination,
-  message = "Lấy danh sách transaction thành công",
-  success = true
-) => {
-  return {
-    message,
-    success,
-    data: {
-      transactions,
-      pagination: {
-        current_page: pagination.current_page,
-        items_per_page: pagination.items_per_page,
-        total_items: pagination.total_items,
-        total_pages: pagination.total_pages,
-        has_next_page: pagination.has_next_page,
-        has_prev_page: pagination.has_prev_page,
-      },
-    },
-  };
-};
+// Removed: createAppointmentResponse, createPaymentResponse, createTransactionResponse
+// Use createPaginatedResponse for all controllers
 
 /**
  * Validate pagination parameters
@@ -200,9 +110,6 @@ module.exports = {
   createPagination,
   applyPagination,
   createPaginatedResponse,
-  createAppointmentResponse,
-  createPaymentResponse,
-  createTransactionResponse,
   validatePagination,
   applyAggregationPagination,
 };

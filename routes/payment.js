@@ -221,6 +221,11 @@ router.get(
  *           type: string
  *           enum: [pending, paid, cancelled, failed]
  *         description: Lọc theo trạng thái
+ *       - in: query
+ *         name: user_id
+ *         schema:
+ *           type: string
+ *         description: Lọc theo user ID
  *     responses:
  *       200:
  *         description: Lấy danh sách thanh toán thành công
@@ -232,25 +237,19 @@ router.get(
 router.get(
   "/list",
   auth.authMiddleWare,
-  auth.requireRole("admin"),
+  auth.requireRole("customer", "staff", "admin"),
   payment.getPaymentList
 );
 
 /**
  * @swagger
- * /api/payment/user-transactions/{username}:
+ * /api/payment/myTransactions:
  *   get:
- *     summary: Lấy danh sách transaction theo username
+ *     summary: Lấy danh sách transactions của user hiện tại đang đăng nhập
  *     tags: [Payments]
  *     security:
  *       - bearerAuth: []
  *     parameters:
- *       - in: path
- *         name: username
- *         required: true
- *         schema:
- *           type: string
- *         description: Username của user
  *       - in: query
  *         name: page
  *         schema:
@@ -267,11 +266,11 @@ router.get(
  *         name: status
  *         schema:
  *           type: string
- *           enum: [pending, paid, cancelled, failed]
+ *           enum: [pending, paid, cancelled]
  *         description: Lọc theo trạng thái
  *     responses:
  *       200:
- *         description: Lấy danh sách transaction theo user thành công
+ *         description: Lấy danh sách transactions thành công
  *         content:
  *           application/json:
  *             schema:
@@ -283,66 +282,16 @@ router.get(
  *                   type: boolean
  *                 data:
  *                   type: object
- *                   properties:
- *                     transactions:
- *                       type: array
- *                       items:
- *                         type: object
- *                         properties:
- *                           order_code:
- *                             type: number
- *                           amount:
- *                             type: number
- *                           description:
- *                             type: string
- *                           status:
- *                             type: string
- *                           created_at:
- *                             type: string
- *                             format: date-time
- *                           paid_at:
- *                             type: string
- *                             format: date-time
- *                           customer_info:
- *                             type: object
- *                             properties:
- *                               user_id:
- *                                 type: string
- *                               username:
- *                                 type: string
- *                               fullName:
- *                                 type: string
- *                               email:
- *                                 type: string
- *                               phone:
- *                                 type: string
- *                               address:
- *                                 type: string
- *                               role:
- *                                 type: string
- *                     pagination:
- *                       type: object
- *                       properties:
- *                         current_page:
- *                           type: integer
- *                         total_pages:
- *                           type: integer
- *                         total_items:
- *                           type: integer
- *                         items_per_page:
- *                           type: integer
  *       401:
  *         description: Unauthorized
- *       404:
- *         description: Không tìm thấy thông tin user
  *       500:
  *         description: Lỗi server
  */
 router.get(
-  "/user-transactions/:username",
+  "/myTransactions",
   auth.authMiddleWare,
-  auth.requireRole("customer", "staff", "admin"),
-  payment.getUserTransactions
+  auth.requireRole("customer", "staff", "admin", "technician"),
+  payment.getMyTransactions
 );
 
 /**

@@ -3,8 +3,7 @@ const User = require("../model/user");
 const Payment = require("../model/payment");
 const {
   createPagination,
-  createPaymentResponse,
-  createTransactionResponse,
+  createPaginatedResponse,
   validatePagination,
 } = require("../utils/pagination");
 
@@ -86,7 +85,7 @@ exports.createPaymentLink = async (req, res) => {
       status: "pending",
       checkout_url: paymentLinkResponse.checkoutUrl,
       qr_code: paymentLinkResponse.qrCode,
-      expired_at: new Date(Date.now() + 15 * 60 * 1000), // 15 phút
+      expired_at: new Date(Date.now() + 15 * 60 * 1000),
     };
 
     const payment = await new Payment(paymentData).save();
@@ -294,7 +293,7 @@ exports.paymentCancel = async (req, res) => {
 exports.getPaymentList = async (req, res) => {
   try {
     const userId = req._id?.toString();
-    const { page = 1, limit = 10, status } = req.query;
+    const { page = 1, limit = 10, status, user_id } = req.query;
 
     if (!userId) {
       return res.status(401).json({
@@ -312,6 +311,9 @@ exports.getPaymentList = async (req, res) => {
     if (status) {
       query.status = status;
     }
+    if (user_id) {
+      query.user_id = user_id;
+    }
 
     const total = await Payment.countDocuments(query);
     const pagination = createPagination(validatedPage, validatedLimit, total);
@@ -323,7 +325,7 @@ exports.getPaymentList = async (req, res) => {
       .limit(pagination.limit)
       .lean();
 
-    const response = createPaymentResponse(
+    const response = createPaginatedResponse(
       payments,
       pagination,
       "Lấy danh sách thanh toán thành công"
@@ -339,22 +341,15 @@ exports.getPaymentList = async (req, res) => {
   }
 };
 
-exports.getUserTransactions = async (req, res) => {
+// Lấy transactions của user hiện tại đang đăng nhập
+exports.getMyTransactions = async (req, res) => {
   try {
-    const { username } = req.params;
+    const userId = req._id?.toString();
     const { page = 1, limit = 10, status } = req.query;
 
-    if (!username) {
-      return res.status(400).json({
-        message: "Thiếu username",
-        success: false,
-      });
-    }
-
-    const user = await User.findOne({ username: username }).select("-password");
-    if (!user) {
-      return res.status(404).json({
-        message: "Không tìm thấy user với username này",
+    if (!userId) {
+      return res.status(401).json({
+        message: "Unauthorized",
         success: false,
       });
     }
@@ -364,7 +359,7 @@ exports.getUserTransactions = async (req, res) => {
       limit
     );
 
-    const query = { user_id: user._id };
+    const query = { user_id: userId };
     if (status) {
       query.status = status;
     }
@@ -378,30 +373,16 @@ exports.getUserTransactions = async (req, res) => {
       .limit(pagination.limit)
       .lean();
 
-    const formattedTransactions = transactions.map((transaction) => ({
-      _id: transaction._id,
-      order_code: transaction.order_code,
-      amount: transaction.amount,
-      description: transaction.description,
-      status: transaction.status,
-      checkout_url: transaction.checkout_url,
-      qr_code: transaction.qr_code,
-      paid_at: transaction.paid_at,
-      expired_at: transaction.expired_at,
-      createdAt: transaction.createdAt,
-      updatedAt: transaction.updatedAt,
-    }));
-
-    const response = createTransactionResponse(
-      formattedTransactions,
+    const response = createPaginatedResponse(
+      transactions,
       pagination,
-      "Lấy danh sách transaction theo user thành công"
+      "Lấy danh sách transactions của tôi thành công"
     );
     return res.status(200).json(response);
   } catch (error) {
-    console.error("Get user transactions error:", error);
+    console.error("Get my transactions error:", error);
     return res.status(500).json({
-      message: "Lỗi lấy danh sách transaction theo user",
+      message: "Lỗi lấy danh sách transactions",
       error: error.message,
       success: false,
     });

@@ -35,13 +35,23 @@ const auth = require("../middlewares/auth");
  *         name: status
  *         schema:
  *           type: string
- *           enum: [pending, accept, completed, canceled]
+ *           enum: [pending, accept, deposited, completed, paid, canceled]
  *         description: Lọc theo trạng thái
  *       - in: query
  *         name: service_center_id
  *         schema:
  *           type: string
  *         description: Lọc theo service center
+ *       - in: query
+ *         name: technician_id
+ *         schema:
+ *           type: string
+ *         description: Lọc theo technician ID
+ *       - in: query
+ *         name: customer_id
+ *         schema:
+ *           type: string
+ *         description: Lọc theo customer ID
  *     responses:
  *       200:
  *         description: Lấy danh sách appointment thành công
@@ -143,7 +153,7 @@ const auth = require("../middlewares/auth");
 router.get(
   "/list",
   auth.authMiddleWare,
-  auth.requireRole("staff", "admin"),
+  auth.requireRole("customer", "staff", "admin"),
   appointment.getAppointments
 );
 
@@ -167,6 +177,7 @@ router.get(
  *               - user_id
  *               - vehicle_id
  *               - center_id
+ *               - service_type_id
  *             properties:
  *               appoinment_date:
  *                 type: string
@@ -180,11 +191,7 @@ router.get(
  *               notes:
  *                 type: string
  *                 example: "Bảo dưỡng định kỳ xe điện"
- *                 description: Ghi chú
- *               estimated_cost:
- *                 type: number
- *                 example: 500000
- *                 description: Chi phí ước tính
+ *                 description: Ghi chú (optional)
  *               user_id:
  *                 type: string
  *                 example: "68d4e34293dfe03972909142"
@@ -197,13 +204,17 @@ router.get(
  *                 type: string
  *                 example: "68e0f04908abb1b3a1334e54"
  *                 description: ID của service center
+ *               service_type_id:
+ *                 type: string
+ *                 example: "68e0f04908abb1b3a1334e56"
+ *                 description: ID của service type (BẮT BUỘC - estimated_cost sẽ lấy từ base_price)
  *               assigned:
  *                 type: string
  *                 example: "68e0f04908abb1b3a1334e55"
  *                 description: ID của technician (optional - customer có thể tự chọn technician ngay khi tạo)
  *     responses:
  *       201:
- *         description: Tạo appointment thành công (tự động tạo payment tạm ứng 2000 VND và status = "deposited")
+ *         description: Tạo appointment thành công (estimated_cost = base_price từ service_type, tự động tạo payment tạm ứng 2000 VND và trừ vào estimated_cost)
  *         content:
  *           application/json:
  *             schema:
@@ -227,6 +238,10 @@ router.get(
  *                       type: string
  *                     estimated_cost:
  *                       type: number
+ *                       description: Số tiền còn lại cần thanh toán (đã trừ deposit 2000 VND)
+ *                     service_type_id:
+ *                       type: object
+ *                       description: Thông tin service type
  *                     user_id:
  *                       type: object
  *                     center_id:
@@ -237,6 +252,9 @@ router.get(
  *                       type: object
  *                     assigned:
  *                       type: object
+ *                     payment_id:
+ *                       type: object
+ *                       description: Thông tin payment deposit
  *                     createdAt:
  *                       type: string
  *                       format: date-time
@@ -248,7 +266,7 @@ router.get(
  *       401:
  *         description: Unauthorized
  *       404:
- *         description: Không tìm thấy user, vehicle, service center hoặc technician
+ *         description: Không tìm thấy user, vehicle, service center, service type hoặc technician
  *       500:
  *         description: Lỗi server
  */
@@ -346,25 +364,19 @@ router.put(
 router.put(
   "/update-status",
   auth.authMiddleWare,
-  auth.requireRole("staff", "admin"),
+  auth.requireRole("customer", "staff", "admin"),
   appointment.updateAppointmentStatus
 );
 
 /**
  * @swagger
- * /api/appointment/user/{username}:
+ * /api/appointment/myAppointment:
  *   get:
- *     summary: Lấy danh sách appointment theo username
+ *     summary: Lấy danh sách appointments của user hiện tại đang đăng nhập
  *     tags: [Appointments]
  *     security:
  *       - bearerAuth: []
  *     parameters:
- *       - in: path
- *         name: username
- *         required: true
- *         schema:
- *           type: string
- *         description: Username của khách hàng
  *       - in: query
  *         name: page
  *         schema:
@@ -381,11 +393,11 @@ router.put(
  *         name: status
  *         schema:
  *           type: string
- *           enum: [pending, accept, completed, canceled]
+ *           enum: [pending, accept, deposited, completed, paid, canceled]
  *         description: Lọc theo trạng thái
  *     responses:
  *       200:
- *         description: Lấy danh sách appointment theo username thành công
+ *         description: Lấy danh sách appointments thành công
  *         content:
  *           application/json:
  *             schema:
@@ -397,157 +409,16 @@ router.put(
  *                   type: boolean
  *                 data:
  *                   type: object
- *                   properties:
- *                     appointments:
- *                       type: array
- *                       items:
- *                         type: object
- *                         properties:
- *                           _id:
- *                             type: string
- *                           user_id:
- *                             type: object
- *                             properties:
- *                               _id:
- *                                 type: string
- *                               username:
- *                                 type: string
- *                               fullName:
- *                                 type: string
- *                               email:
- *                                 type: string
- *                               phone:
- *                                 type: string
- *                           center_id:
- *                             type: object
- *                             properties:
- *                               _id:
- *                                 type: string
- *                               name:
- *                                 type: string
- *                               address:
- *                                 type: string
- *                               phone:
- *                                 type: string
- *                           vehicle_id:
- *                             type: object
- *                             properties:
- *                               _id:
- *                                 type: string
- *                               license_plate:
- *                                 type: string
- *                               brand:
- *                                 type: string
- *                               model:
- *                                 type: string
- *                               year:
- *                                 type: number
- *                           service_type_id:
- *                             type: object
- *                             properties:
- *                               _id:
- *                                 type: string
- *                               name:
- *                                 type: string
- *                               price:
- *                                 type: number
- *                               description:
- *                                 type: string
- *                           assigned_technician:
- *                             type: object
- *                             properties:
- *                               _id:
- *                                 type: string
- *                               username:
- *                                 type: string
- *                               fullName:
- *                                 type: string
- *                               email:
- *                                 type: string
- *                               phone:
- *                                 type: string
- *                           appointment_date:
- *                             type: string
- *                             format: date-time
- *                           status:
- *                             type: string
- *                           service_type:
- *                             type: string
- *                           notes:
- *                             type: string
- *                     pagination:
- *                       type: object
- *                       properties:
- *                         current_page:
- *                           type: integer
- *                         total_pages:
- *                           type: integer
- *                         total_items:
- *                           type: integer
- *                         items_per_page:
- *                           type: integer
  *       401:
  *         description: Unauthorized
- *       404:
- *         description: Không tìm thấy user
  *       500:
  *         description: Lỗi server
  */
 router.get(
-  "/user/:username",
+  "/myAppointment",
   auth.authMiddleWare,
-  auth.requireRole("customer", "staff", "admin"),
-  appointment.getAppointmentsByUsername
-);
-
-/**
- * @swagger
- * /api/appointment/technician/{technicianId}:
- *   get:
- *     summary: Lấy danh sách appointment theo technician
- *     tags: [Appointments]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: technicianId
- *         required: true
- *         schema:
- *           type: string
- *         description: ID của technician
- *       - in: query
- *         name: page
- *         schema:
- *           type: integer
- *           default: 1
- *         description: Số trang
- *       - in: query
- *         name: limit
- *         schema:
- *           type: integer
- *           default: 10
- *         description: Số item per page
- *       - in: query
- *         name: status
- *         schema:
- *           type: string
- *           enum: [pending, accept, completed, canceled]
- *         description: Lọc theo trạng thái
- *     responses:
- *       200:
- *         description: Lấy danh sách appointment theo technician thành công
- *       401:
- *         description: Unauthorized
- *       404:
- *         description: Không tìm thấy technician
- *       500:
- *         description: Lỗi server
- */
-router.get(
-  "/technician/:technicianId",
-  auth.authMiddleWare,
-  auth.requireRole("staff", "admin"),
-  appointment.getAppointmentsByTechnician
+  auth.requireRole("customer", "staff", "admin", "technician"),
+  appointment.getMyAppointments
 );
 
 /**
