@@ -396,7 +396,8 @@ exports.getAppointmentsByTechnician = async (req, res) => {
     });
   }
 };
-
+// 123
+// dsadsa
 exports.createAppointment = async (req, res) => {
   try {
     const {
