@@ -133,7 +133,7 @@ exports.assignTechnician = async (req, res) => {
 
     appointment.assigned_by = assignedBy;
     appointment.assigned = technician_id;
-    appointment.status = "accept";
+    appointment.status = "accepted";
     await appointment.save();
 
     const updatedAppointment = await Appointment.findById(appointment_id)
@@ -251,8 +251,9 @@ exports.updateAppointmentStatus = async (req, res) => {
 
     const validStatuses = [
       "pending",
-      "accept",
+      "accepted",
       "deposited",
+      "in_progress",
       "completed",
       "paid",
       "canceled",
@@ -260,7 +261,7 @@ exports.updateAppointmentStatus = async (req, res) => {
     if (!validStatuses.includes(status)) {
       return res.status(400).json({
         message:
-          "Status không hợp lệ. Chỉ chấp nhận: pending, accept, deposited, completed, paid, canceled",
+          "Status không hợp lệ. Chỉ chấp nhận: pending, accepted, deposited, in_progress, completed, paid, canceled",
         success: false,
       });
     }
@@ -279,7 +280,7 @@ exports.updateAppointmentStatus = async (req, res) => {
     appointment.status = status;
 
     if (oldStatus === "pending" && status === "deposited") {
-      const depositAmount = appointment.payment_id?.amount || 2000;
+      const depositAmount = appointment.payment_id?.amount || 100000;
       appointment.estimated_cost = Math.max(
         0,
         appointment.estimated_cost - depositAmount

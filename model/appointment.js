@@ -13,8 +13,10 @@ const appointmentSchema = new schema(
       type: String,
       enum: [
         "pending",
-        "accepted",
         "deposited",
+        "accepted",
+        "assigned",
+        "in_progress",
         "completed",
         "paid",
         "canceled",
@@ -26,6 +28,9 @@ const appointmentSchema = new schema(
     },
     estimated_cost: {
       type: Number,
+    },
+    reason: {
+      type: String,
     },
     user_id: {
       type: mongoose.Types.ObjectId,

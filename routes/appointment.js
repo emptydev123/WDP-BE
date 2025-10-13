@@ -270,7 +270,7 @@ router.get(
  *       500:
  *         description: Lỗi server
  */
-router.post(
+router.put(
   "/create",
   auth.authMiddleWare,
   auth.requireRole("customer", "admin"),
@@ -280,7 +280,7 @@ router.post(
 /**
  * @swagger
  * /api/appointment/assign-technician:
- *   post:
+ *   put:
  *     summary: Nhận lịch (assign technician)
  *     tags: [Appointments]
  *     security:
