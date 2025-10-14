@@ -18,11 +18,11 @@ const serviceTypesSchema = new schema({
         type: Boolean,
         default: true,
     },
-    service_package_id: {
-        type: mongoose.Types.ObjectId,
-        ref: "ServicePackage",
-        // required: true
-    },
+    // service_package_id: {
+    //     type: mongoose.Types.ObjectId,
+    //     ref: "ServicePackage",
+    //     // required: true
+    // },
     vehicle_id: {
         type: String,
         ref: "Vehicle"

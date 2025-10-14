@@ -506,196 +506,196 @@ exports.getAppointmentsByTechnician = async (req, res) => {
   }
 };
 
-exports.createAppointment = async (req, res) => {
-  try {
-    const {
-      appoinment_date,
-      appoinment_time,
-      notes,
-      user_id,
-      vehicle_id,
-      center_id,
-      assigned,
-      service_type_id,
-    } = req.body;
-    const userId = req._id?.toString();
+// exports.createAppointment = async (req, res) => {
+//   try {
+//     const {
+//       appoinment_date,
+//       appoinment_time,
+//       notes,
+//       user_id,
+//       vehicle_id,
+//       center_id,
+//       assigned,
+//       service_type_id,
+//     } = req.body;
+//     const userId = req._id?.toString();
 
-    if (!userId) {
-      return res.status(401).json({
-        message: "Unauthorized",
-        success: false,
-      });
-    }
+//     if (!userId) {
+//       return res.status(401).json({
+//         message: "Unauthorized",
+//         success: false,
+//       });
+//     }
 
-    if (
-      !appoinment_date ||
-      !appoinment_time ||
-      !user_id ||
-      !vehicle_id ||
-      !center_id ||
-      !service_type_id
-    ) {
-      return res.status(400).json({
-        message: "Thiếu thông tin bắt buộc",
-        success: false,
-      });
-    }
+//     if (
+//       !appoinment_date ||
+//       !appoinment_time ||
+//       !user_id ||
+//       !vehicle_id ||
+//       !center_id ||
+//       !service_type_id
+//     ) {
+//       return res.status(400).json({
+//         message: "Thiếu thông tin bắt buộc",
+//         success: false,
+//       });
+//     }
 
-    const user = await User.findById(user_id);
-    if (!user) {
-      return res.status(404).json({
-        message: "Không tìm thấy user",
-        success: false,
-      });
-    }
+//     const user = await User.findById(user_id);
+//     if (!user) {
+//       return res.status(404).json({
+//         message: "Không tìm thấy user",
+//         success: false,
+//       });
+//     }
 
-    const vehicle = await Vehicle.findById(vehicle_id);
-    if (!vehicle) {
-      return res.status(404).json({
-        message: "Không tìm thấy vehicle",
-        success: false,
-      });
-    }
+//     const vehicle = await Vehicle.findById(vehicle_id);
+//     if (!vehicle) {
+//       return res.status(404).json({
+//         message: "Không tìm thấy vehicle",
+//         success: false,
+//       });
+//     }
 
-    const serviceCenter = await ServiceCenter.findById(center_id);
-    if (!serviceCenter) {
-      return res.status(404).json({
-        message: "Không tìm thấy service center",
-        success: false,
-      });
-    }
+//     const serviceCenter = await ServiceCenter.findById(center_id);
+//     if (!serviceCenter) {
+//       return res.status(404).json({
+//         message: "Không tìm thấy service center",
+//         success: false,
+//       });
+//     }
 
-    const serviceType = await ServiceType.findById(service_type_id);
-    if (!serviceType) {
-      return res.status(404).json({
-        message: "Không tìm thấy service type",
-        success: false,
-      });
-    }
+//     const serviceType = await ServiceType.findById(service_type_id);
+//     if (!serviceType) {
+//       return res.status(404).json({
+//         message: "Không tìm thấy service type",
+//         success: false,
+//       });
+//     }
 
-    if (assigned) {
-      const technician = await User.findById(assigned);
-      if (!technician) {
-        return res.status(404).json({
-          message: "Không tìm thấy technician",
-          success: false,
-        });
-      }
-      if (technician.role !== "technician") {
-        return res.status(400).json({
-          message: "User được gán không phải là technician",
-          success: false,
-        });
-      }
-    }
+//     if (assigned) {
+//       const technician = await User.findById(assigned);
+//       if (!technician) {
+//         return res.status(404).json({
+//           message: "Không tìm thấy technician",
+//           success: false,
+//         });
+//       }
+//       if (technician.role !== "technician") {
+//         return res.status(400).json({
+//           message: "User được gán không phải là technician",
+//           success: false,
+//         });
+//       }
+//     }
 
-    const appointment = new Appointment({
-      appoinment_date: new Date(appoinment_date),
-      appoinment_time,
-      notes,
-      estimated_cost: serviceType.base_price || 0,
-      user_id,
-      vehicle_id,
-      center_id,
-      service_type_id,
-      status: "pending",
-      assigned_by: null,
-      assigned: assigned || null,
-    });
+//     const appointment = new Appointment({
+//       appoinment_date: new Date(appoinment_date),
+//       appoinment_time,
+//       notes,
+//       estimated_cost: serviceType.base_price || 0,
+//       user_id,
+//       vehicle_id,
+//       center_id,
+//       service_type_id,
+//       status: "pending",
+//       assigned_by: null,
+//       assigned: assigned || null,
+//     });
 
-    await appointment.save();
+//     await appointment.save();
 
-    const depositAmount = 2000;
-    const depositDescription = `Tam ung ${appointment._id
-      .toString()
-      .slice(-6)}`;
+//     const depositAmount = 2000;
+//     const depositDescription = `Tam ung ${appointment._id
+//       .toString()
+//       .slice(-6)}`;
 
-    const paymentReq = {
-      _id: userId,
-      body: {
-        amount: depositAmount,
-        description: depositDescription,
-      },
-    };
+//     const paymentReq = {
+//       _id: userId,
+//       body: {
+//         amount: depositAmount,
+//         description: depositDescription,
+//       },
+//     };
 
-    let paymentResult = null;
-    const paymentRes = {
-      status: (code) => ({
-        json: (data) => {
-          console.log(
-            `Payment response - Status: ${code}, Data:`,
-            JSON.stringify(data, null, 2)
-          );
-          if (code === 201) {
-            paymentResult = data;
-          }
-        },
-      }),
-    };
+//     let paymentResult = null;
+//     const paymentRes = {
+//       status: (code) => ({
+//         json: (data) => {
+//           console.log(
+//             `Payment response - Status: ${code}, Data:`,
+//             JSON.stringify(data, null, 2)
+//           );
+//           if (code === 201) {
+//             paymentResult = data;
+//           }
+//         },
+//       }),
+//     };
 
-    try {
-      await PaymentController.createPaymentLink(paymentReq, paymentRes);
-    } catch (paymentError) {
-      const orderCode = Date.now();
-      const fallbackPayment = new Payment({
-        order_code: orderCode,
-        amount: depositAmount,
-        description: depositDescription,
-        status: "pending",
-        user_id: userId,
-      });
+//     try {
+//       await PaymentController.createPaymentLink(paymentReq, paymentRes);
+//     } catch (paymentError) {
+//       const orderCode = Date.now();
+//       const fallbackPayment = new Payment({
+//         order_code: orderCode,
+//         amount: depositAmount,
+//         description: depositDescription,
+//         status: "pending",
+//         user_id: userId,
+//       });
 
-      await fallbackPayment.save();
-      paymentResult = {
-        success: true,
-        data: {
-          payment_id: fallbackPayment._id,
-          order_code: orderCode,
-          amount: depositAmount,
-          status: "pending",
-        },
-      };
-    }
+//       await fallbackPayment.save();
+//       paymentResult = {
+//         success: true,
+//         data: {
+//           payment_id: fallbackPayment._id,
+//           order_code: orderCode,
+//           amount: depositAmount,
+//           status: "pending",
+//         },
+//       };
+//     }
 
-    if (paymentResult && paymentResult.success) {
-      appointment.payment_id = paymentResult.data.payment_id;
-      // Chưa trừ estimated_cost ở đây
-      // estimated_cost sẽ trừ khi cập nhật status sang "deposited"
-      await appointment.save();
-    }
+//     if (paymentResult && paymentResult.success) {
+//       appointment.payment_id = paymentResult.data.payment_id;
+//       // Chưa trừ estimated_cost ở đây
+//       // estimated_cost sẽ trừ khi cập nhật status sang "deposited"
+//       await appointment.save();
+//     }
 
-    const populatedAppointment = await Appointment.findById(appointment._id)
-      .populate("user_id", "username fullName email phone")
-      .populate("center_id", "name address phone")
-      .populate("vehicle_id", "license_plate brand model year")
-      .populate("assigned_by", "username fullName email phone role")
-      .populate("assigned", "username fullName email phone role")
-      .populate("payment_id", "order_code amount status checkout_url qr_code")
-      .populate(
-        "final_payment_id",
-        "order_code amount status checkout_url qr_code"
-      )
-      .populate(
-        "service_type_id",
-        "service_name description base_price estimated_duration"
-      );
+//     const populatedAppointment = await Appointment.findById(appointment._id)
+//       .populate("user_id", "username fullName email phone")
+//       .populate("center_id", "name address phone")
+//       .populate("vehicle_id", "license_plate brand model year")
+//       .populate("assigned_by", "username fullName email phone role")
+//       .populate("assigned", "username fullName email phone role")
+//       .populate("payment_id", "order_code amount status checkout_url qr_code")
+//       .populate(
+//         "final_payment_id",
+//         "order_code amount status checkout_url qr_code"
+//       )
+//       .populate(
+//         "service_type_id",
+//         "service_name description base_price estimated_duration"
+//       );
 
-    return res.status(201).json({
-      message: assigned
-        ? "Tạo appointment thành công, đã chọn technician và tạo payment link tạm ứng"
-        : "Tạo appointment thành công và tạo payment link tạm ứng",
-      success: true,
-      data: populatedAppointment,
-    });
-  } catch (error) {
-    console.error("Create appointment error:", error);
-    return res.status(500).json({
-      message: "Lỗi tạo appointment",
-      error: error.message,
-      success: false,
-    });
-  }
-};
+//     return res.status(201).json({
+//       message: assigned
+//         ? "Tạo appointment thành công, đã chọn technician và tạo payment link tạm ứng"
+//         : "Tạo appointment thành công và tạo payment link tạm ứng",
+//       success: true,
+//       data: populatedAppointment,
+//     });
+//   } catch (error) {
+//     console.error("Create appointment error:", error);
+//     return res.status(500).json({
+//       message: "Lỗi tạo appointment",
+//       error: error.message,
+//       success: false,
+//     });
+//   }
+// };
 
 exports.createFinalPayment = async (req, res) => {
   try {
@@ -883,3 +883,312 @@ exports.deleteAppointment = async (req, res) => {
     });
   }
 };
+exports.createAppointment = async (req, res) => {
+  try {
+    const {
+      appoinment_date,
+      appoinment_time,
+      notes,
+      user_id,
+      vehicle_id,
+      center_id,
+      service_type_id,
+    } = req.body;
+
+    const userId = req._id?.toString();
+    if (!userId)
+      return res.status(401).json({ message: "Unauthorized", success: false });
+
+    if (
+      !appoinment_date ||
+      !appoinment_time ||
+      !user_id ||
+      !vehicle_id ||
+      !center_id ||
+      !service_type_id
+    ) {
+      return res
+        .status(400)
+        .json({ message: "Thiếu thông tin bắt buộc", success: false });
+    }
+
+    // ======== [Validate Entities] ========
+    const [user, vehicle, serviceCenter, serviceType] = await Promise.all([
+      User.findById(user_id),
+      Vehicle.findById(vehicle_id),
+      ServiceCenter.findById(center_id),
+      ServiceType.findById(service_type_id),
+    ]);
+
+    if (!user)
+      return res
+        .status(404)
+        .json({ message: "Không tìm thấy user", success: false });
+    if (!vehicle)
+      return res
+        .status(404)
+        .json({ message: "Không tìm thấy vehicle", success: false });
+    if (!serviceCenter)
+      return res
+        .status(404)
+        .json({ message: "Không tìm thấy service center", success: false });
+    if (!serviceType)
+      return res
+        .status(404)
+        .json({ message: "Không tìm thấy service type", success: false });
+
+    // ======== [Chuẩn bị dữ liệu thời gian] ========
+    const appointmentDate = new Date(appoinment_date);
+
+    const BUFFER_MS = 5 * 60 * 1000; // 5 phút buffer
+
+    // parse estimated_duration → milliseconds
+    const parseDurationToMs = (s) => {
+      if (!s) return 0;
+      const str = String(s).trim().toLowerCase();
+
+      // dạng "xhym"
+      const hMatch = str.match(/(\d+(\.\d+)?)\s*h/);
+      const mMatch = str.match(/(\d+)\s*m/);
+      if (hMatch) {
+        const hours = parseFloat(hMatch[1]);
+        const minAfterH = str.match(/h\s*(\d+)\s*m/);
+        let mins = 0;
+        if (minAfterH) mins = parseInt(minAfterH[1], 10);
+        return (hours * 60 + mins) * 60 * 1000;
+      }
+      if (mMatch) return parseInt(mMatch[1], 10) * 60 * 1000;
+
+      // dạng "H:MM"
+      const colon = str.match(/^(\d{1,2}):(\d{2})$/);
+      if (colon) {
+        const h = parseInt(colon[1], 10);
+        const m = parseInt(colon[2], 10);
+        return (h * 60 + m) * 60 * 1000;
+      }
+
+      // dạng số (h hoặc m)
+      const num = parseFloat(str.replace(",", "."));
+      if (!isNaN(num)) {
+        if (num > 0 && num <= 24) return num * 60 * 60 * 1000;
+        return num * 60 * 1000;
+      }
+      return 0;
+    };
+
+    const buildLocalDateTime = (dateStr, timeStr) => {
+      const [y, m, d] = dateStr.split("-").map((x) => parseInt(x, 10));
+      const [hh, mm] = timeStr.split(":").map((x) => parseInt(x, 10));
+      return new Date(y, m - 1, d, hh || 0, mm || 0, 0, 0);
+    };
+
+    const newStart = buildLocalDateTime(appoinment_date, appoinment_time);
+    const newEnd = new Date(
+      newStart.getTime() +
+      parseDurationToMs(serviceType.estimated_duration) +
+      BUFFER_MS
+    );
+
+    // ======== [Lấy appointments hiện có của user] ========
+    const existingAppointments = await Appointment.find({
+      user_id,
+      status: {
+        $in: [
+          "pending",
+          "confirmed",
+          "in_progress",
+          "deposited",
+          "completed",
+          "paid",
+        ],
+      },
+    })
+      .populate("service_type_id")
+      .populate("center_id")
+      .populate("vehicle_id");
+
+    // Case 1: Cùng trung tâm, cùng xe, cùng dịch vụ => tối đa 2 lần
+    const sameCombo = existingAppointments.filter(
+      (a) =>
+        a.center_id._id.toString() === center_id &&
+        a.vehicle_id._id.toString() === vehicle_id &&
+        a.service_type_id._id.toString() === service_type_id &&
+        a.appoinment_date.toISOString().split("T")[0] === appoinment_date
+    );
+    if (sameCombo.length >= 2) {
+      return res.status(400).json({
+        message:
+          "Bạn chỉ có thể tạo tối đa 2 lịch cho cùng một trung tâm, xe và dịch vụ.",
+        success: false,
+      });
+    }
+
+    // Case 2: Cùng thời điểm, khác trung tâm nhưng cùng xe + dịch vụ => không được tạo
+    const sameTimeConflict = existingAppointments.find(
+      (a) =>
+        a.appoinment_date.toISOString().split("T")[0] === appoinment_date &&
+        a.appoinment_time === appoinment_time &&
+        a.vehicle_id._id.toString() === vehicle_id &&
+        a.service_type_id._id.toString() === service_type_id &&
+        a.center_id._id.toString() !== center_id
+    );
+    if (sameTimeConflict) {
+      return res.status(400).json({
+        message:
+          "Xe này đã có lịch dịch vụ tương tự ở trung tâm khác tại cùng thời điểm.",
+        success: false,
+      });
+    }
+
+    // Case 4 & 6: Cùng xe, cùng ngày — check overlap theo estimated_duration
+    const overlapAppointment = existingAppointments.find((a) => {
+      if (a.vehicle_id._id.toString() !== vehicle_id) return false;
+
+      const existingDateStr = a.appoinment_date.toISOString().split("T")[0];
+      const newDateStr = appointmentDate.toISOString().split("T")[0];
+      if (existingDateStr !== newDateStr) return false;
+
+      const existingDurationStr =
+        (a.service_type_id && a.service_type_id.estimated_duration) ||
+        a.estimated_duration ||
+        null;
+
+      const existingStart = buildLocalDateTime(
+        existingDateStr,
+        a.appoinment_time
+      );
+      const existingEnd = new Date(
+        existingStart.getTime() +
+        parseDurationToMs(existingDurationStr) +
+        BUFFER_MS
+      );
+
+      const overlap =
+        (newStart >= existingStart && newStart < existingEnd) ||
+        (newEnd > existingStart && newEnd <= existingEnd) ||
+        (newStart <= existingStart && newEnd >= existingEnd);
+
+      return overlap;
+    });
+
+    if (overlapAppointment) {
+      console.warn(
+        " Overlap detected with appointment:",
+        overlapAppointment._id?.toString?.() || overlapAppointment
+      );
+      return res.status(400).json({
+        message:
+          "Xe này đã có lịch trong khoảng thời gian này (bao gồm thời lượng dịch vụ). Vui lòng chọn giờ khác.",
+        success: false,
+      });
+    }
+
+    // Case 5: Tổng số lịch đang pending > 2 => không cho tạo thêm
+    const pendingAppointments = existingAppointments.filter(
+      (a) => a.status === "pending"
+    );
+    if (pendingAppointments.length >= 2) {
+      return res.status(400).json({
+        message:
+          "Bạn đang có 2 lịch pending. Vui lòng thanh toán hoặc hoàn tất trước khi đặt lịch mới.",
+        success: false,
+      });
+    }
+
+    // ======== [Tạo appointment nếu hợp lệ] ========
+    const appointment = new Appointment({
+      appoinment_date: appointmentDate,
+      appoinment_time,
+      notes,
+      estimated_cost: serviceType.base_price || 0,
+      user_id,
+      vehicle_id,
+      center_id,
+      service_type_id,
+      status: "pending",
+      assigned_by: null,
+      assigned: null,
+    });
+
+    await appointment.save();
+
+    // ======== [Tạo payment link] ========
+    const depositAmount = 2000;
+    const depositDescription = `Tam ung ${appointment._id
+      .toString()
+      .slice(-6)}`;
+
+    const paymentReq = {
+      _id: userId,
+      body: { amount: depositAmount, description: depositDescription },
+    };
+
+    let paymentResult = null;
+    const paymentRes = {
+      status: (code) => ({
+        json: (data) => {
+          if (code === 201) paymentResult = data;
+        },
+      }),
+    };
+
+    try {
+      await PaymentController.createPaymentLink(paymentReq, paymentRes);
+    } catch (paymentError) {
+      const orderCode = Date.now();
+      const fallbackPayment = new Payment({
+        order_code: orderCode,
+        amount: depositAmount,
+        description: depositDescription,
+        status: "pending",
+        user_id: userId,
+      });
+      await fallbackPayment.save();
+      paymentResult = {
+        success: true,
+        data: {
+          payment_id: fallbackPayment._id,
+          order_code: orderCode,
+          amount: depositAmount,
+          status: "pending",
+        },
+      };
+    }
+
+    if (paymentResult && paymentResult.success) {
+      appointment.payment_id = paymentResult.data.payment_id;
+      await appointment.save();
+    }
+
+    const populatedAppointment = await Appointment.findById(appointment._id)
+      .populate("user_id", "username fullName email phone")
+      .populate("center_id", "name address phone")
+      .populate("vehicle_id", "license_plate brand model year")
+      .populate("payment_id", "order_code amount status checkout_url qr_code")
+      .populate(
+        "final_payment_id",
+        "order_code amount status checkout_url qr_code"
+      )
+      .populate(
+        "service_type_id",
+        "service_name description base_price estimated_duration"
+      );
+
+    return res.status(201).json({
+      message:
+        "Tạo appointment thành công và tạo payment link tạm ứng.",
+      success: true,
+      data: populatedAppointment,
+    });
+  } catch (error) {
+    console.error("Create appointment error:", error);
+    return res.status(500).json({
+      message: "Lỗi tạo appointment",
+      error: error.message,
+      success: false,
+    });
+  }
+};
+
+
+
