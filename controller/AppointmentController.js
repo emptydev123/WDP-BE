@@ -89,6 +89,78 @@ exports.getAppointments = async (req, res) => {
   }
 };
 
+// Lấy lịch làm việc của technician để check conflict trước khi assign
+exports.getTechnicianSchedule = async (req, res) => {
+  try {
+    const { technician_id, date } = req.query;
+    const userId = req._id?.toString();
+
+    if (!userId) {
+      return res.status(401).json({
+        message: "Unauthorized",
+        success: false,
+      });
+    }
+
+    if (!technician_id || !date) {
+      return res.status(400).json({
+        message: "Thiếu technician_id hoặc date",
+        success: false,
+      });
+    }
+
+    // Validate technician
+    const technician = await User.findById(technician_id);
+    if (!technician || technician.role !== "technical") {
+      return res.status(404).json({
+        message: "Technician không tồn tại",
+        success: false,
+      });
+    }
+
+    // Lấy tất cả appointments của technician trong ngày
+    const targetDate = new Date(date);
+    const startOfDay = new Date(targetDate);
+    startOfDay.setHours(0, 0, 0, 0);
+    const endOfDay = new Date(targetDate);
+    endOfDay.setHours(23, 59, 59, 999);
+
+    const schedules = await Appointment.find({
+      assigned: technician_id,
+      appoinment_date: {
+        $gte: startOfDay,
+        $lte: endOfDay,
+      },
+      status: { $in: ["accepted", "assigned", "in_progress"] },
+    })
+      .select("appoinment_time estimated_end_time status")
+      .sort({ appoinment_time: 1 })
+      .lean();
+
+    return res.status(200).json({
+      message: "Lấy lịch làm việc của technician thành công",
+      success: true,
+      data: {
+        technician: {
+          _id: technician._id,
+          fullName: technician.fullName,
+        },
+        date,
+        schedules,
+        is_available: schedules.length === 0,
+        total_assignments: schedules.length,
+      },
+    });
+  } catch (error) {
+    console.error("Get technician schedule error:", error);
+    return res.status(500).json({
+      message: "Lỗi lấy lịch làm việc",
+      error: error.message,
+      success: false,
+    });
+  }
+};
+
 exports.assignTechnician = async (req, res) => {
   try {
     const { appointment_id, technician_id } = req.body;
@@ -108,7 +180,10 @@ exports.assignTechnician = async (req, res) => {
       });
     }
 
-    const appointment = await Appointment.findById(appointment_id);
+    // Lấy appointment và populate service_type để lấy estimated_duration
+    const appointment = await Appointment.findById(appointment_id).populate(
+      "service_type_id"
+    );
     if (!appointment) {
       return res.status(404).json({
         message: "Không tìm thấy appointment",
@@ -123,16 +198,91 @@ exports.assignTechnician = async (req, res) => {
       });
     }
 
+    // Validate technician
     const technician = await User.findById(technician_id);
-    if (!technician || technician.role !== "technician") {
+    if (!technician || technician.role !== "technical") {
       return res.status(400).json({
         message: "Technician không tồn tại hoặc không có quyền",
         success: false,
       });
     }
 
+    // Lấy estimated_duration từ service_type
+    const estimatedDuration = appointment.service_type_id?.estimated_duration;
+    if (!estimatedDuration) {
+      return res.status(400).json({
+        message: "Service type không có estimated_duration",
+        success: false,
+      });
+    }
+
+    // Tính thời gian kết thúc ước tính
+    // Parse appointment_time (format: "09:00")
+    const [hours, minutes] = appointment.appoinment_time.split(":");
+    const startMinutes = parseInt(hours) * 60 + parseInt(minutes);
+
+    // Parse estimated_duration (giả sử format: "2" nghĩa là 2 giờ)
+    const durationMinutes = parseFloat(estimatedDuration) * 60;
+    const endMinutes = startMinutes + durationMinutes;
+
+    // Convert back to HH:mm
+    const endHours = Math.floor(endMinutes / 60);
+    const endMins = endMinutes % 60;
+    const estimatedEndTime = `${String(endHours).padStart(2, "0")}:${String(
+      endMins
+    ).padStart(2, "0")}`;
+
+    // Helper function để so sánh thời gian
+    const timeToMinutes = (time) => {
+      const [h, m] = time.split(":").map(Number);
+      return h * 60 + m;
+    };
+
+    // Check xem technician có đang bận trong khung giờ này không
+    // Lấy tất cả appointments của technician trong cùng ngày
+    const appointmentDate = new Date(appointment.appoinment_date);
+    const startOfDay = new Date(appointmentDate);
+    startOfDay.setHours(0, 0, 0, 0);
+    const endOfDay = new Date(appointmentDate);
+    endOfDay.setHours(23, 59, 59, 999);
+
+    const technicianAppointments = await Appointment.find({
+      assigned: technician_id,
+      appoinment_date: {
+        $gte: startOfDay,
+        $lte: endOfDay,
+      },
+      status: { $in: ["accepted", "assigned", "in_progress"] }, // Chỉ check appointments đang active
+      _id: { $ne: appointment_id }, // Loại trừ appointment hiện tại
+    }).lean();
+
+    // Check conflict về thời gian
+    for (const existingAppt of technicianAppointments) {
+      if (!existingAppt.estimated_end_time) continue; // Skip nếu không có end time
+
+      const newStart = timeToMinutes(appointment.appoinment_time);
+      const newEnd = timeToMinutes(estimatedEndTime);
+      const existStart = timeToMinutes(existingAppt.appoinment_time);
+      const existEnd = timeToMinutes(existingAppt.estimated_end_time);
+
+      // Check overlap: (newStart < existEnd) && (newEnd > existStart)
+      if (newStart < existEnd && newEnd > existStart) {
+        return res.status(400).json({
+          message: `Technician đang bận từ ${existingAppt.appoinment_time} đến ${existingAppt.estimated_end_time}`,
+          success: false,
+          conflict: {
+            appointment_id: existingAppt._id,
+            time_start: existingAppt.appoinment_time,
+            time_end: existingAppt.estimated_end_time,
+          },
+        });
+      }
+    }
+
+    // Update appointment với thông tin assign và thời gian ước tính
     appointment.assigned_by = assignedBy;
     appointment.assigned = technician_id;
+    appointment.estimated_end_time = estimatedEndTime;
     appointment.status = "accepted";
     await appointment.save();
 
@@ -156,7 +306,10 @@ exports.assignTechnician = async (req, res) => {
     return res.status(200).json({
       message: "Assign technician thành công",
       success: true,
-      data: updatedAppointment,
+      data: {
+        appointment: updatedAppointment,
+        estimated_completion: estimatedEndTime,
+      },
     });
   } catch (error) {
     console.error("Assign technician error:", error);

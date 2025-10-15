@@ -279,9 +279,44 @@ router.put(
 
 /**
  * @swagger
+ * /api/appointment/technician-schedule:
+ *   get:
+ *     summary: Xem lịch làm việc của technician (check conflict)
+ *     tags: [Appointments]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: technician_id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: ID của technician
+ *       - in: query
+ *         name: date
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: date
+ *         example: "2024-01-15"
+ *         description: Ngày cần check (YYYY-MM-DD)
+ *     responses:
+ *       200:
+ *         description: Success
+ *       404:
+ *         description: Technician not found
+ */
+router.get(
+  "/technician-schedule",
+  auth.authMiddleWare,
+  appointment.getTechnicianSchedule
+);
+
+/**
+ * @swagger
  * /api/appointment/assign-technician:
  *   put:
- *     summary: Nhận lịch (assign technician)
+ *     summary: Gán technician cho appointment (Auto check conflict & tính end time)
  *     tags: [Appointments]
  *     security:
  *       - bearerAuth: []
@@ -305,9 +340,25 @@ router.put(
  *                 description: ID của technician
  *     responses:
  *       200:
- *         description: Nhận lịch thành công
+ *         description: Assign thành công
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     appointment:
+ *                       type: object
+ *                     estimated_completion:
+ *                       type: string
+ *                       example: "11:00"
+ *                       description: Thời gian ước tính hoàn thành
  *       400:
- *         description: Dữ liệu đầu vào không hợp lệ
+ *         description: Technician đang bận (conflict về thời gian)
  *       401:
  *         description: Unauthorized
  *       404:
