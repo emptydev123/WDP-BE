@@ -1,25 +1,34 @@
-const mongoose = require('mongoose')
-const schema = mongoose.Schema
-const partSchema = new schema({
+const mongoose = require("mongoose");
+const schema = mongoose.Schema;
+const partSchema = new schema(
+  {
     part_number: {
-        type: String,
+      type: String,
     },
     part_name: {
-        type: String,
+      type: String,
     },
     description: {
-        type: String
+      type: String,
+    },
+    cost_price: {
+      type: Number,
+      required: true,
+      // Giá gốc/giá nhập
     },
     unit_price: {
-        type: String
+      type: Number,
+      required: true,
+      // Giá bán
     },
     supplier: {
-        type: String
+      type: String,
     },
     warranty_month: {
-        type: Number
+      type: Number,
     },
-
-}, { timestamps: true });
+  },
+  { timestamps: true }
+);
 const part = mongoose.model("Part", partSchema);
 module.exports = part;

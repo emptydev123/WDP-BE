@@ -19,13 +19,11 @@ exports.getAllParts = async (req, res) => {
       });
     }
 
-    // Validation pagination
     const { page: validatedPage, limit: validatedLimit } = validatePagination(
       page,
       limit
     );
 
-    // Build filter
     const filter = {};
     if (search) {
       filter.$or = [
@@ -35,10 +33,8 @@ exports.getAllParts = async (req, res) => {
       ];
     }
 
-    // Create pagination
     const pagination = createPagination(validatedPage, validatedLimit);
 
-    // Get parts with pagination
     const parts = await Part.find(filter)
       .sort({ createdAt: -1 })
       .skip(pagination.skip)
@@ -123,6 +119,7 @@ exports.createPart = async (req, res) => {
       part_number,
       part_name,
       description,
+      cost_price,
       unit_price,
       supplier,
       warranty_month,
@@ -143,7 +140,20 @@ exports.createPart = async (req, res) => {
       });
     }
 
-    // Check if part_number already exists
+    if (!cost_price) {
+      return res.status(400).json({
+        message: "Thiếu giá gốc (cost_price)",
+        success: false,
+      });
+    }
+
+    if (!unit_price) {
+      return res.status(400).json({
+        message: "Thiếu giá bán (unit_price)",
+        success: false,
+      });
+    }
+
     if (part_number) {
       const existingPart = await Part.findOne({ part_number });
       if (existingPart) {
@@ -158,6 +168,7 @@ exports.createPart = async (req, res) => {
       part_number,
       part_name,
       description,
+      cost_price,
       unit_price,
       supplier,
       warranty_month,
@@ -188,6 +199,7 @@ exports.updatePart = async (req, res) => {
       part_number,
       part_name,
       description,
+      cost_price,
       unit_price,
       supplier,
       warranty_month,
@@ -216,7 +228,6 @@ exports.updatePart = async (req, res) => {
       });
     }
 
-    // Check if part_number already exists (if changed)
     if (part_number && part_number !== part.part_number) {
       const existingPart = await Part.findOne({ part_number });
       if (existingPart) {
@@ -227,10 +238,10 @@ exports.updatePart = async (req, res) => {
       }
     }
 
-    // Update fields
     if (part_number !== undefined) part.part_number = part_number;
     if (part_name !== undefined) part.part_name = part_name;
     if (description !== undefined) part.description = description;
+    if (cost_price !== undefined) part.cost_price = cost_price;
     if (unit_price !== undefined) part.unit_price = unit_price;
     if (supplier !== undefined) part.supplier = supplier;
     if (warranty_month !== undefined) part.warranty_month = warranty_month;
@@ -280,7 +291,6 @@ exports.deletePart = async (req, res) => {
       });
     }
 
-    // Kiểm tra xem part có được sử dụng trong inventory không
     const Inventory = require("../model/inventory");
     const inventoryUsingPart = await Inventory.findOne({ part_id: partId });
 
