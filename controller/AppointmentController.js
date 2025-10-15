@@ -10,6 +10,7 @@ const {
   createPaginatedResponse,
   validatePagination,
 } = require("../utils/pagination");
+const { parseDurationToMs, buildLocalDateTime } = require('../utils/timeUtils')
 
 exports.getAppointments = async (req, res) => {
   try {
@@ -659,197 +660,6 @@ exports.getAppointmentsByTechnician = async (req, res) => {
   }
 };
 
-exports.createAppointment = async (req, res) => {
-  try {
-    const {
-      appoinment_date,
-      appoinment_time,
-      notes,
-      user_id,
-      vehicle_id,
-      center_id,
-      assigned,
-      service_type_id,
-    } = req.body;
-    const userId = req._id?.toString();
-
-    if (!userId) {
-      return res.status(401).json({
-        message: "Unauthorized",
-        success: false,
-      });
-    }
-
-    if (
-      !appoinment_date ||
-      !appoinment_time ||
-      !user_id ||
-      !vehicle_id ||
-      !center_id ||
-      !service_type_id
-    ) {
-      return res.status(400).json({
-        message: "Thiếu thông tin bắt buộc",
-        success: false,
-      });
-    }
-
-    const user = await User.findById(user_id);
-    if (!user) {
-      return res.status(404).json({
-        message: "Không tìm thấy user",
-        success: false,
-      });
-    }
-
-    const vehicle = await Vehicle.findById(vehicle_id);
-    if (!vehicle) {
-      return res.status(404).json({
-        message: "Không tìm thấy vehicle",
-        success: false,
-      });
-    }
-
-    const serviceCenter = await ServiceCenter.findById(center_id);
-    if (!serviceCenter) {
-      return res.status(404).json({
-        message: "Không tìm thấy service center",
-        success: false,
-      });
-    }
-
-    const serviceType = await ServiceType.findById(service_type_id);
-    if (!serviceType) {
-      return res.status(404).json({
-        message: "Không tìm thấy service type",
-        success: false,
-      });
-    }
-
-    if (assigned) {
-      const technician = await User.findById(assigned);
-      if (!technician) {
-        return res.status(404).json({
-          message: "Không tìm thấy technician",
-          success: false,
-        });
-      }
-      if (technician.role !== "technician") {
-        return res.status(400).json({
-          message: "User được gán không phải là technician",
-          success: false,
-        });
-      }
-    }
-
-    const appointment = new Appointment({
-      appoinment_date: new Date(appoinment_date),
-      appoinment_time,
-      notes,
-      estimated_cost: serviceType.base_price || 0,
-      user_id,
-      vehicle_id,
-      center_id,
-      service_type_id,
-      status: "pending",
-      assigned_by: null,
-      assigned: assigned || null,
-    });
-
-    await appointment.save();
-
-    const depositAmount = 2000;
-    const depositDescription = `Tam ung ${appointment._id
-      .toString()
-      .slice(-6)}`;
-
-    const paymentReq = {
-      _id: userId,
-      body: {
-        amount: depositAmount,
-        description: depositDescription,
-      },
-    };
-
-    let paymentResult = null;
-    const paymentRes = {
-      status: (code) => ({
-        json: (data) => {
-          console.log(
-            `Payment response - Status: ${code}, Data:`,
-            JSON.stringify(data, null, 2)
-          );
-          if (code === 201) {
-            paymentResult = data;
-          }
-        },
-      }),
-    };
-
-    try {
-      await PaymentController.createPaymentLink(paymentReq, paymentRes);
-    } catch (paymentError) {
-      const orderCode = Date.now();
-      const fallbackPayment = new Payment({
-        order_code: orderCode,
-        amount: depositAmount,
-        description: depositDescription,
-        status: "pending",
-        user_id: userId,
-      });
-
-      await fallbackPayment.save();
-      paymentResult = {
-        success: true,
-        data: {
-          payment_id: fallbackPayment._id,
-          order_code: orderCode,
-          amount: depositAmount,
-          status: "pending",
-        },
-      };
-    }
-
-    if (paymentResult && paymentResult.success) {
-      appointment.payment_id = paymentResult.data.payment_id;
-      // Chưa trừ estimated_cost ở đây
-      // estimated_cost sẽ trừ khi cập nhật status sang "deposited"
-      await appointment.save();
-    }
-
-    const populatedAppointment = await Appointment.findById(appointment._id)
-      .populate("user_id", "username fullName email phone")
-      .populate("center_id", "name address phone")
-      .populate("vehicle_id", "license_plate brand model year")
-      .populate("assigned_by", "username fullName email phone role")
-      .populate("assigned", "username fullName email phone role")
-      .populate("payment_id", "order_code amount status checkout_url qr_code")
-      .populate(
-        "final_payment_id",
-        "order_code amount status checkout_url qr_code"
-      )
-      .populate(
-        "service_type_id",
-        "service_name description base_price estimated_duration"
-      );
-
-    return res.status(201).json({
-      message: assigned
-        ? "Tạo appointment thành công, đã chọn technician và tạo payment link tạm ứng"
-        : "Tạo appointment thành công và tạo payment link tạm ứng",
-      success: true,
-      data: populatedAppointment,
-    });
-  } catch (error) {
-    console.error("Create appointment error:", error);
-    return res.status(500).json({
-      message: "Lỗi tạo appointment",
-      error: error.message,
-      success: false,
-    });
-  }
-};
-
 exports.createFinalPayment = async (req, res) => {
   try {
     const { appointmentId } = req.params;
@@ -1036,3 +846,195 @@ exports.deleteAppointment = async (req, res) => {
     });
   }
 };
+exports.validateAppointmentRules = async ({
+  appoinment_date,
+  appoinment_time,
+  center_id,
+  vehicle_id,
+  service_type_id,
+  serviceType,
+  existingAppointments,
+}) => {
+  const BUFFER_MS = 5 * 60 * 1000;
+  const newStart = buildLocalDateTime(appoinment_date, appoinment_time);
+  const newEnd = new Date(
+    newStart.getTime() + parseDurationToMs(serviceType.estimated_duration) + BUFFER_MS
+  );
+
+  const activeStatuses = ["pending", "in_progress"]; // trạng thái "đang hoạt động"
+  const finishedStatuses = ["completed", "cancelled"]; // trạng thái đã kết thúc
+
+  // CASE 0: Cùng xe, cùng trung tâm, cùng dịch vụ, cùng ngày & giờ (bất kỳ trạng thái nào trừ cancelled/completed)
+  const exactSame = existingAppointments.find(
+    (a) =>
+      a.center_id._id.toString() === center_id &&
+      a.vehicle_id._id.toString() === vehicle_id &&
+      a.service_type_id._id.toString() === service_type_id &&
+      a.appoinment_date.toISOString().split("T")[0] === appoinment_date &&
+      a.appoinment_time === appoinment_time &&
+      !finishedStatuses.includes(a.status)
+  );
+  if (exactSame) {
+    return "Đã tồn tại lịch hẹn trùng hoàn toàn (trung tâm, xe, dịch vụ, ngày, giờ).";
+  }
+
+  // CASE 1: Cùng trung tâm, xe, dịch vụ → tối đa 2 lần (chỉ tính pending/in_progress)
+  const sameCombo = existingAppointments.filter(
+    (a) =>
+      a.center_id._id.toString() === center_id &&
+      a.vehicle_id._id.toString() === vehicle_id &&
+      a.service_type_id._id.toString() === service_type_id &&
+      a.appoinment_date.toISOString().split("T")[0] === appoinment_date &&
+      activeStatuses.includes(a.status)
+  );
+  if (sameCombo.length >= 2) {
+    return "Bạn chỉ có thể tạo tối đa 2 lịch đang hoạt động (pending/in_progress) cho cùng trung tâm, xe và dịch vụ.";
+  }
+
+  // CASE 2: Trung tâm khác nhưng cùng giờ
+  const sameTimeConflict = existingAppointments.find(
+    (a) =>
+      a.appoinment_date.toISOString().split("T")[0] === appoinment_date &&
+      a.appoinment_time === appoinment_time &&
+      a.vehicle_id._id.toString() === vehicle_id &&
+      a.center_id._id.toString() !== center_id &&
+      !finishedStatuses.includes(a.status)
+  );
+  if (sameTimeConflict) {
+    return "Xe này đã có lịch ở trung tâm khác tại cùng thời điểm.";
+  }
+
+  // CASE 3: Overlap theo estimated_duration (tính buffer)
+  const overlapAppointment = existingAppointments.find((a) => {
+    if (a.vehicle_id._id.toString() !== vehicle_id) return false;
+
+    const existingDateStr = a.appoinment_date.toISOString().split("T")[0];
+    if (existingDateStr !== appoinment_date) return false;
+
+    const existingDurationStr =
+      (a.service_type_id && a.service_type_id.estimated_duration) ||
+      a.estimated_duration;
+
+    const existingStart = buildLocalDateTime(existingDateStr, a.appoinment_time);
+    const existingEnd = new Date(
+      existingStart.getTime() +
+      parseDurationToMs(existingDurationStr) +
+      BUFFER_MS
+    );
+
+    const overlap =
+      (newStart >= existingStart && newStart < existingEnd) ||
+      (newEnd > existingStart && newEnd <= existingEnd) ||
+      (newStart <= existingStart && newEnd >= existingEnd);
+
+    return overlap && !finishedStatuses.includes(a.status);
+  });
+  if (overlapAppointment)
+    return "Xe này đã có lịch trong khoảng thời gian này (bao gồm thời lượng dịch vụ).";
+
+  return null; // hợp lệ
+};
+
+exports.createDepositPayment = async (userId, appointmentId) => {
+  const depositAmount = 2000;
+  const description = `Tam ung ${appointmentId.toString().slice(-6)}`;
+
+  let paymentResult = null;
+  const paymentReq = { _id: userId, body: { amount: depositAmount, description } };
+  const paymentRes = {
+    status: (code) => ({
+      json: (data) => {
+        if (code === 201) paymentResult = data;
+      },
+    }),
+  };
+
+  try {
+    await PaymentController.createPaymentLink(paymentReq, paymentRes);
+  } catch {
+    const orderCode = Date.now();
+    const fallback = new Payment({
+      order_code: orderCode,
+      amount: depositAmount,
+      description,
+      status: "pending",
+      user_id: userId,
+    });
+    await fallback.save();
+    paymentResult = {
+      success: true,
+      data: { payment_id: fallback._id, order_code: orderCode, amount: depositAmount },
+    };
+  }
+  return paymentResult;
+};
+exports.createAppointment = async (req, res) => {
+  try {
+    const { appoinment_date, appoinment_time, notes, user_id, vehicle_id, center_id, service_type_id } = req.body;
+    const userId = req._id?.toString();
+    if (!userId) return res.status(401).json({ message: "Unauthorized", success: false });
+
+    // Validate entity tồn tại
+    const [user, vehicle, serviceCenter, serviceType] = await Promise.all([
+      User.findById(user_id),
+      Vehicle.findById(vehicle_id),
+      ServiceCenter.findById(center_id),
+      ServiceType.findById(service_type_id),
+    ]);
+    if (!user || !vehicle || !serviceCenter || !serviceType)
+      return res.status(404).json({ message: "Thông tin không hợp lệ", success: false });
+
+    // Lấy danh sách lịch cũ
+    const existingAppointments = await Appointment.find({
+      user_id,
+      status: { $in: ["pending", "confirmed", "in_progress", "deposited", "completed", "paid"] },
+    })
+      .populate("service_type_id center_id vehicle_id");
+
+    // Check rule tổng hợp
+    const ruleError = await exports.validateAppointmentRules({
+      appoinment_date,
+      appoinment_time,
+      center_id,
+      vehicle_id,
+      service_type_id,
+      serviceType,
+      existingAppointments,
+    });
+    if (ruleError) return res.status(400).json({ message: ruleError, success: false });
+
+    // Tạo appointment
+    const appointment = new Appointment({
+      appoinment_date: new Date(appoinment_date),
+      appoinment_time,
+      notes,
+      estimated_cost: serviceType.base_price || 0,
+      user_id,
+      vehicle_id,
+      center_id,
+      service_type_id,
+      status: "pending",
+    });
+    await appointment.save();
+
+    // Tạo link thanh toán
+    const paymentResult = await exports.createDepositPayment(userId, appointment._id);
+    if (paymentResult?.success) {
+      appointment.payment_id = paymentResult.data.payment_id;
+      await appointment.save();
+    }
+
+    return res.status(201).json({
+      message: "Tạo appointment thành công",
+      success: true,
+      data: appointment,
+    });
+  } catch (error) {
+    console.error("Create appointment error:", error);
+    return res.status(500).json({ message: "Lỗi tạo appointment", error: error.message, success: false });
+  }
+};
+
+
+
+

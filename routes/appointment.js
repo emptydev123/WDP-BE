@@ -161,7 +161,7 @@ router.get(
  * @swagger
  * /api/appointment/create:
  *   post:
- *     summary: Tạo appointment mới
+ *     summary: Tạo appointment mới (có kiểm tra điều kiện nâng cao)
  *     tags: [Appointments]
  *     security:
  *       - bearerAuth: []
@@ -182,39 +182,35 @@ router.get(
  *               appoinment_date:
  *                 type: string
  *                 format: date
- *                 example: "2024-01-15"
- *                 description: Ngày hẹn
+ *                 example: "2025-10-12"
+ *                 description: Ngày hẹn (bắt buộc)
  *               appoinment_time:
  *                 type: string
  *                 example: "09:00"
- *                 description: Giờ hẹn
+ *                 description: Giờ hẹn (bắt buộc)
  *               notes:
  *                 type: string
- *                 example: "Bảo dưỡng định kỳ xe điện"
- *                 description: Ghi chú (optional)
+ *                 example: "Bảo dưỡng định kỳ xe điện VinFast"
+ *                 description: Ghi chú thêm (optional)
  *               user_id:
  *                 type: string
- *                 example: "68d4e34293dfe03972909142"
- *                 description: ID của user
+ *                 example: "66e4e34293dfe03972909142"
+ *                 description: ID người dùng (bắt buộc)
  *               vehicle_id:
  *                 type: string
- *                 example: "68e0f04908abb1b3a1334e53"
- *                 description: ID của vehicle
+ *                 example: "66e0f04908abb1b3a1334e53"
+ *                 description: ID xe cần bảo dưỡng (bắt buộc)
  *               center_id:
  *                 type: string
- *                 example: "68e0f04908abb1b3a1334e54"
- *                 description: ID của service center
+ *                 example: "66e0f04908abb1b3a1334e54"
+ *                 description: ID trung tâm bảo dưỡng (bắt buộc)
  *               service_type_id:
  *                 type: string
- *                 example: "68e0f04908abb1b3a1334e56"
- *                 description: ID của service type (BẮT BUỘC - estimated_cost sẽ lấy từ base_price)
- *               assigned:
- *                 type: string
- *                 example: "68e0f04908abb1b3a1334e55"
- *                 description: ID của technician (optional - customer có thể tự chọn technician ngay khi tạo)
+ *                 example: "66e0f04908abb1b3a1334e56"
+ *                 description: ID loại dịch vụ bảo dưỡng (bắt buộc)
  *     responses:
  *       201:
- *         description: Tạo appointment thành công (estimated_cost = base_price từ service_type, tự động tạo payment tạm ứng 2000 VND và trừ vào estimated_cost)
+ *         description: Tạo appointment thành công (đã tạo payment tạm ứng 2000 VND)
  *         content:
  *           application/json:
  *             schema:
@@ -222,10 +218,12 @@ router.get(
  *               properties:
  *                 message:
  *                   type: string
+ *                   example: "Tạo appointment thành công và tạo payment link tạm ứng"
  *                 success:
  *                   type: boolean
  *                 data:
  *                   type: object
+ *                   description: Thông tin đầy đủ của appointment sau khi tạo
  *                   properties:
  *                     _id:
  *                       type: string
@@ -238,23 +236,21 @@ router.get(
  *                       type: string
  *                     estimated_cost:
  *                       type: number
- *                       description: Số tiền còn lại cần thanh toán (đã trừ deposit 2000 VND)
- *                     service_type_id:
- *                       type: object
- *                       description: Thông tin service type
  *                     user_id:
  *                       type: object
- *                     center_id:
- *                       type: object
+ *                       description: Thông tin người đặt
  *                     vehicle_id:
  *                       type: object
- *                     assigned_by:
+ *                       description: Thông tin xe
+ *                     center_id:
  *                       type: object
- *                     assigned:
+ *                       description: Thông tin trung tâm bảo dưỡng
+ *                     service_type_id:
  *                       type: object
+ *                       description: Thông tin loại dịch vụ
  *                     payment_id:
  *                       type: object
- *                       description: Thông tin payment deposit
+ *                       description: Thông tin thanh toán tạm ứng
  *                     createdAt:
  *                       type: string
  *                       format: date-time
@@ -262,20 +258,21 @@ router.get(
  *                       type: string
  *                       format: date-time
  *       400:
- *         description: Thiếu thông tin bắt buộc hoặc user được gán không phải là technician
+ *         description: Thiếu thông tin bắt buộc hoặc vi phạm quy tắc đặt lịch
  *       401:
- *         description: Unauthorized
+ *         description: Không có quyền truy cập
  *       404:
- *         description: Không tìm thấy user, vehicle, service center, service type hoặc technician
+ *         description: Không tìm thấy user, vehicle, service center hoặc service type
  *       500:
- *         description: Lỗi server
+ *         description: Lỗi server khi tạo appointment
  */
-router.put(
+router.post(
   "/create",
   auth.authMiddleWare,
-  auth.requireRole("customer", "admin"),
+  auth.requireRole("customer", "admin", "staff", "technical"),
   appointment.createAppointment
 );
+
 
 /**
  * @swagger
