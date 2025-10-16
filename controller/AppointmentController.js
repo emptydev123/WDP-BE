@@ -51,7 +51,6 @@ exports.getAppointments = async (req, res) => {
 
     const query = {};
 
-    // Filter cơ bản
     if (status) {
       query.status = status;
     }
@@ -65,14 +64,8 @@ exports.getAppointments = async (req, res) => {
       query.user_id = customer_id;
     }
 
-    // Filter theo thời gian thực - technician đang làm việc
     if (is_working_now === "true") {
       const now = new Date();
-      const currentTime = `${String(now.getHours()).padStart(2, "0")}:${String(
-        now.getMinutes()
-      ).padStart(2, "0")}`;
-
-      // Lấy appointments đang in_progress hoặc assigned trong hôm nay
       const startOfToday = new Date(now);
       startOfToday.setHours(0, 0, 0, 0);
       const endOfToday = new Date(now);
@@ -84,10 +77,8 @@ exports.getAppointments = async (req, res) => {
       };
       query.status = { $in: ["in_progress", "assigned", "accepted"] };
       query.assigned = { $ne: null };
-      // Note: Sẽ filter thêm dựa trên estimated_end_time sau khi query
     }
 
-    // Filter theo ngày cụ thể
     if (date) {
       const targetDate = new Date(date);
       const startOfDay = new Date(targetDate);
@@ -101,7 +92,6 @@ exports.getAppointments = async (req, res) => {
       };
     }
 
-    // Filter theo khoảng thời gian (date range)
     if (date_from || date_to) {
       query.appoinment_date = {};
 
@@ -141,12 +131,8 @@ exports.getAppointments = async (req, res) => {
       .limit(pagination.limit)
       .lean();
 
-    // Post-processing cho is_working_now - sử dụng utility functions
     if (is_working_now === "true") {
-      const now = new Date();
-      const currentTime = `${String(now.getHours()).padStart(2, "0")}:${String(
-        now.getMinutes()
-      ).padStart(2, "0")}`;
+      const currentTime = getCurrentTime();
       const currentTimeMinutes = timeToMinutes(currentTime);
 
       appointments = appointments.filter((appt) => {
@@ -155,7 +141,6 @@ exports.getAppointments = async (req, res) => {
         const startMinutes = timeToMinutes(appt.appoinment_time);
         const endMinutes = timeToMinutes(appt.estimated_end_time);
 
-        // Check nếu hiện tại nằm trong khoảng start -> end
         return (
           currentTimeMinutes >= startMinutes && currentTimeMinutes <= endMinutes
         );
@@ -291,33 +276,25 @@ exports.assignTechnician = async (req, res) => {
     //   });
     // }
 
-    // RULE 2: Check conflict - CHỈ với appointments đang in_progress
-    // Lấy appointments của technician đang làm việc (status = in_progress)
     const technicianAppointments = await Appointment.find({
       assigned: technician_id,
-      status: "in_progress", // CHỈ check appointments đang làm việc
-      estimated_end_time: { $ne: null }, // Phải có estimated_end_time
+      status: "in_progress",
+      estimated_end_time: { $ne: null },
       _id: { $ne: appointment_id },
     }).lean();
 
-    // Check conflict với buffer 1 tiếng
-    // VD: Đơn A estimated_end_time = 09:30 → Buffer đến 10:30
-    // → Đơn B phải có appoinment_time >= 10:30 mới được assign
     const BUFFER_HOURS = 1;
     const newAppointmentTimeMinutes = timeToMinutes(
       appointment.appoinment_time
     );
 
     for (const existingAppt of technicianAppointments) {
-      // Cộng buffer 1 tiếng vào estimated_end_time sử dụng utility function
       const endTimeWithBuffer = addBufferToTime(
         existingAppt.estimated_end_time,
         BUFFER_HOURS
       );
       const endTimeWithBufferMinutes = timeToMinutes(endTimeWithBuffer);
 
-      // Conflict: Appointment mới bắt đầu TRƯỚC thời gian kết thúc có buffer
-      // VD: Existing end = 10:30, new start = 10:10 → Conflict
       if (newAppointmentTimeMinutes < endTimeWithBufferMinutes) {
         return res.status(400).json({
           message: `Technician đang bận đến ${endTimeWithBuffer} (bao gồm buffer 1 tiếng)`,
@@ -368,7 +345,6 @@ exports.assignTechnician = async (req, res) => {
   }
 };
 
-// Lấy appointments của user hiện tại đang đăng nhập
 exports.getMyAppointments = async (req, res) => {
   try {
     const { page = 1, limit = 10, status } = req.query;
@@ -480,18 +456,14 @@ exports.updateAppointmentStatus = async (req, res) => {
     const oldStatus = appointment.status;
     appointment.status = status;
 
-    // Khi chuyển sang in_progress, cập nhật thời gian bắt đầu thực tế và tính end time
     if (status === "in_progress" && oldStatus !== "in_progress") {
       const estimatedDuration = appointment.service_type_id?.estimated_duration;
 
       if (estimatedDuration) {
-        // Lấy thời gian thực tế technician bắt đầu làm sử dụng utility function
         const actualStartTime = getCurrentTime();
 
-        // Cập nhật appoinment_time = thời gian thực tế bắt đầu làm
         appointment.appoinment_time = actualStartTime;
 
-        // Tính end time = actual start time + duration
         const durationHours = parseFloat(estimatedDuration);
         const estimatedEndTime = calculateEndTime(
           actualStartTime,
@@ -932,10 +904,10 @@ exports.validateAppointmentRules = async ({
       BUFFER_MS
   );
 
-  const activeStatuses = ["pending", "in_progress"]; // trạng thái "đang hoạt động"
-  const finishedStatuses = ["completed", "cancelled"]; // trạng thái đã kết thúc
+  const activeStatuses = ["pending", "in_progress"];
+  const finishedStatuses = ["completed", "cancelled"];
 
-  // CASE 0: Cùng xe, cùng trung tâm, cùng dịch vụ, cùng ngày & giờ (bất kỳ trạng thái nào trừ cancelled/completed)
+  // Check trùng hoàn toàn
   const exactSame = existingAppointments.find(
     (a) =>
       a.center_id._id.toString() === center_id &&
@@ -949,7 +921,6 @@ exports.validateAppointmentRules = async ({
     return "Đã tồn tại lịch hẹn trùng hoàn toàn (trung tâm, xe, dịch vụ, ngày, giờ).";
   }
 
-  // CASE 1: Cùng trung tâm, xe, dịch vụ → tối đa 2 lần (chỉ tính pending/in_progress)
   const sameCombo = existingAppointments.filter(
     (a) =>
       a.center_id._id.toString() === center_id &&
@@ -962,7 +933,6 @@ exports.validateAppointmentRules = async ({
     return "Bạn chỉ có thể tạo tối đa 2 lịch đang hoạt động (pending/in_progress) cho cùng trung tâm, xe và dịch vụ.";
   }
 
-  // CASE 2: Trung tâm khác nhưng cùng giờ
   const sameTimeConflict = existingAppointments.find(
     (a) =>
       a.appoinment_date.toISOString().split("T")[0] === appoinment_date &&
@@ -975,7 +945,6 @@ exports.validateAppointmentRules = async ({
     return "Xe này đã có lịch ở trung tâm khác tại cùng thời điểm.";
   }
 
-  // CASE 3: Overlap theo estimated_duration (tính buffer)
   const overlapAppointment = existingAppointments.find((a) => {
     if (a.vehicle_id._id.toString() !== vehicle_id) return false;
 
@@ -1006,7 +975,7 @@ exports.validateAppointmentRules = async ({
   if (overlapAppointment)
     return "Xe này đã có lịch trong khoảng thời gian này (bao gồm thời lượng dịch vụ).";
 
-  return null; // hợp lệ
+  return null;
 };
 
 exports.createDepositPayment = async (userId, appointmentId) => {
@@ -1064,7 +1033,6 @@ exports.createAppointment = async (req, res) => {
     if (!userId)
       return res.status(401).json({ message: "Unauthorized", success: false });
 
-    // Validate entity tồn tại
     const [user, vehicle, serviceCenter, serviceType] = await Promise.all([
       User.findById(user_id),
       Vehicle.findById(vehicle_id),
@@ -1076,7 +1044,6 @@ exports.createAppointment = async (req, res) => {
         .status(404)
         .json({ message: "Thông tin không hợp lệ", success: false });
 
-    // Lấy danh sách lịch cũ
     const existingAppointments = await Appointment.find({
       user_id,
       status: {
@@ -1091,7 +1058,6 @@ exports.createAppointment = async (req, res) => {
       },
     }).populate("service_type_id center_id vehicle_id");
 
-    // Check rule tổng hợp
     const ruleError = await exports.validateAppointmentRules({
       appoinment_date,
       appoinment_time,
@@ -1104,7 +1070,6 @@ exports.createAppointment = async (req, res) => {
     if (ruleError)
       return res.status(400).json({ message: ruleError, success: false });
 
-    // Tạo appointment
     const appointment = new Appointment({
       appoinment_date: new Date(appoinment_date),
       appoinment_time,
@@ -1118,7 +1083,6 @@ exports.createAppointment = async (req, res) => {
     });
     await appointment.save();
 
-    // Tạo link thanh toán
     const paymentResult = await exports.createDepositPayment(
       userId,
       appointment._id

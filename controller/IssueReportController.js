@@ -144,7 +144,6 @@ exports.createIssueReport = async (req, res) => {
     }
 
     if (parts_used && parts_used.length > 0) {
-      // Validate cấu trúc của parts_used
       for (const part of parts_used) {
         if (!part.part_id || !part.quantity || !part.unit_cost) {
           return res.status(400).json({
@@ -287,7 +286,6 @@ exports.deleteIssueReport = async (req, res) => {
       });
     }
 
-    // Check quyền
     if (report.appointment_id.assigned?.toString() !== technician_id) {
       return res.status(403).json({
         message: "Bạn không có quyền xóa report này",
