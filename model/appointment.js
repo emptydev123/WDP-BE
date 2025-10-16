@@ -11,8 +11,6 @@ const appointmentSchema = new schema(
     },
     estimated_end_time: {
       type: String,
-      // Thời gian ước tính hoàn thành (HH:mm)
-      // Được tính khi assign: appoinment_time + estimated_duration
     },
     status: {
       type: String,

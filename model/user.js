@@ -1,48 +1,51 @@
-const mongoose = require('mongoose');
+const mongoose = require("mongoose");
 
-const schema = mongoose.Schema
-const userSchema = new schema({
+const schema = mongoose.Schema;
+const userSchema = new schema(
+  {
     username: {
-        type: String,
-        unique: true
+      type: String,
+      unique: true,
     },
     fullName: {
-        type: String,
-        unique: true
+      type: String,
+      unique: true,
     },
     password: {
-        type: String,
-        required: function () {
-            return this.provider === "local";
-        },
+      type: String,
+      required: function () {
+        return this.provider === "local";
+      },
     },
     email: {
-        type: String,
-        unique: true,
+      type: String,
+      unique: true,
     },
     phoneNumber: {
-        type: String,
+      type: String,
     },
     role: {
-        type: String,
-        enum: ['customer', 'staff', 'technical', 'admin'],
-        default: 'customer'
+      type: String,
+      enum: ["customer", "staff", "technical", "admin"],
+      default: "customer",
     },
     provider: {
-        type: String,
-        enum: ["local", "google"],
-        default: "local"
+      type: String,
+      enum: ["local", "google"],
+      default: "local",
     },
     gender: {
-        type: String,
-        enum: ['male', 'female']
+      type: String,
+      enum: ["male", "female"],
     },
     resetToken: {
-        type: String
+      type: String,
     },
     resetTokenExpires: {
-        type: Date
-    }
-}, { timestamps: true })
-const user = mongoose.model('User', userSchema);
-module.exports = user
+      type: Date,
+    },
+  },
+  { timestamps: true }
+);
+const user = mongoose.model("User", userSchema);
+module.exports = user;

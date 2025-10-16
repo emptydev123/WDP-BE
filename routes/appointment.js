@@ -52,6 +52,33 @@ const auth = require("../middlewares/auth");
  *         schema:
  *           type: string
  *         description: Lọc theo customer ID
+ *       - in: query
+ *         name: is_working_now
+ *         schema:
+ *           type: string
+ *           enum: [true, false]
+ *         description: Lọc technician đang làm việc (thời gian thực)
+ *       - in: query
+ *         name: date
+ *         schema:
+ *           type: string
+ *           format: date
+ *         example: "2024-01-15"
+ *         description: Lọc theo ngày cụ thể (YYYY-MM-DD)
+ *       - in: query
+ *         name: date_from
+ *         schema:
+ *           type: string
+ *           format: date
+ *         example: "2024-01-01"
+ *         description: Lọc từ ngày (YYYY-MM-DD)
+ *       - in: query
+ *         name: date_to
+ *         schema:
+ *           type: string
+ *           format: date
+ *         example: "2024-01-31"
+ *         description: Lọc đến ngày (YYYY-MM-DD)
  *     responses:
  *       200:
  *         description: Lấy danh sách appointment thành công
@@ -273,7 +300,6 @@ router.post(
   appointment.createAppointment
 );
 
-
 /**
  * @swagger
  * /api/appointment/technician-schedule:
@@ -366,7 +392,7 @@ router.get(
 router.put(
   "/assign-technician",
   auth.authMiddleWare,
-  auth.requireRole("staff", "admin"),
+  auth.requireRole("customer", "staff", "admin"),
   appointment.assignTechnician
 );
 
