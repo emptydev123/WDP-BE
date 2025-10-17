@@ -10,7 +10,16 @@ const {
   createPaginatedResponse,
   validatePagination,
 } = require("../utils/pagination");
-const { parseDurationToMs, buildLocalDateTime } = require('../utils/timeUtils')
+const {
+  buildLocalDateTime,
+  parseDurationToMs,
+  timeToMinutes,
+  calculateEndTime,
+  checkTimeOverlap,
+  addBufferToTime,
+  getCurrentTime,
+  isPastDate,
+} = require("../utils/timeUtils");
 
 exports.getAppointments = async (req, res) => {
   try {
@@ -21,6 +30,10 @@ exports.getAppointments = async (req, res) => {
       service_center_id,
       technician_id,
       customer_id,
+      is_working_now,
+      date,
+      date_from,
+      date_to,
     } = req.query;
     const userId = req._id?.toString();
 
@@ -37,6 +50,7 @@ exports.getAppointments = async (req, res) => {
     );
 
     const query = {};
+
     if (status) {
       query.status = status;
     }
@@ -50,14 +64,57 @@ exports.getAppointments = async (req, res) => {
       query.user_id = customer_id;
     }
 
-    const total = await Appointment.countDocuments(query);
+    if (is_working_now === "true") {
+      const now = new Date();
+      const startOfToday = new Date(now);
+      startOfToday.setHours(0, 0, 0, 0);
+      const endOfToday = new Date(now);
+      endOfToday.setHours(23, 59, 59, 999);
 
+      query.appoinment_date = {
+        $gte: startOfToday,
+        $lte: endOfToday,
+      };
+      query.status = { $in: ["in_progress", "assigned", "accepted"] };
+      query.assigned = { $ne: null };
+    }
+
+    if (date) {
+      const targetDate = new Date(date);
+      const startOfDay = new Date(targetDate);
+      startOfDay.setHours(0, 0, 0, 0);
+      const endOfDay = new Date(targetDate);
+      endOfDay.setHours(23, 59, 59, 999);
+
+      query.appoinment_date = {
+        $gte: startOfDay,
+        $lte: endOfDay,
+      };
+    }
+
+    if (date_from || date_to) {
+      query.appoinment_date = {};
+
+      if (date_from) {
+        const fromDate = new Date(date_from);
+        fromDate.setHours(0, 0, 0, 0);
+        query.appoinment_date.$gte = fromDate;
+      }
+
+      if (date_to) {
+        const toDate = new Date(date_to);
+        toDate.setHours(23, 59, 59, 999);
+        query.appoinment_date.$lte = toDate;
+      }
+    }
+
+    const total = await Appointment.countDocuments(query);
     const pagination = createPagination(validatedPage, validatedLimit, total);
 
-    const appointments = await Appointment.find(query)
+    let appointments = await Appointment.find(query)
       .populate("user_id", "username fullName email phone")
-      .populate("center_id", "name address phone")
-      .populate("vehicle_id", "license_plate brand model year")
+      .populate("center_id", "center_name address phone")
+      .populate("vehicle_id", "license_plate vin")
       .populate("assigned_by", "username fullName email phone role")
       .populate("assigned", "username fullName email phone role")
       .populate("payment_id", "order_code amount status checkout_url qr_code")
@@ -74,6 +131,22 @@ exports.getAppointments = async (req, res) => {
       .limit(pagination.limit)
       .lean();
 
+    if (is_working_now === "true") {
+      const currentTime = getCurrentTime();
+      const currentTimeMinutes = timeToMinutes(currentTime);
+
+      appointments = appointments.filter((appt) => {
+        if (!appt.estimated_end_time) return false;
+
+        const startMinutes = timeToMinutes(appt.appoinment_time);
+        const endMinutes = timeToMinutes(appt.estimated_end_time);
+
+        return (
+          currentTimeMinutes >= startMinutes && currentTimeMinutes <= endMinutes
+        );
+      });
+    }
+
     const response = createPaginatedResponse(
       appointments,
       pagination,
@@ -84,6 +157,75 @@ exports.getAppointments = async (req, res) => {
     console.error("Get appointments error:", error);
     return res.status(500).json({
       message: "Lỗi lấy danh sách appointment",
+      error: error.message,
+      success: false,
+    });
+  }
+};
+
+exports.getTechnicianSchedule = async (req, res) => {
+  try {
+    const { technician_id, date } = req.query;
+    const userId = req._id?.toString();
+
+    if (!userId) {
+      return res.status(401).json({
+        message: "Unauthorized",
+        success: false,
+      });
+    }
+
+    if (!technician_id || !date) {
+      return res.status(400).json({
+        message: "Thiếu technician_id hoặc date",
+        success: false,
+      });
+    }
+
+    const technician = await User.findById(technician_id);
+    if (!technician || technician.role !== "technical") {
+      return res.status(404).json({
+        message: "Technician không tồn tại",
+        success: false,
+      });
+    }
+
+    const targetDate = new Date(date);
+    const startOfDay = new Date(targetDate);
+    startOfDay.setHours(0, 0, 0, 0);
+    const endOfDay = new Date(targetDate);
+    endOfDay.setHours(23, 59, 59, 999);
+
+    const schedules = await Appointment.find({
+      assigned: technician_id,
+      appoinment_date: {
+        $gte: startOfDay,
+        $lte: endOfDay,
+      },
+      status: { $in: ["accepted", "assigned", "in_progress"] },
+    })
+      .select("appoinment_time estimated_end_time status")
+      .sort({ appoinment_time: 1 })
+      .lean();
+
+    return res.status(200).json({
+      message: "Lấy lịch làm việc của technician thành công",
+      success: true,
+      data: {
+        technician: {
+          _id: technician._id,
+          fullName: technician.fullName,
+        },
+        date,
+        schedules,
+        is_available: schedules.length === 0,
+        total_assignments: schedules.length,
+      },
+    });
+  } catch (error) {
+    console.error("Get technician schedule error:", error);
+    return res.status(500).json({
+      message: "Lỗi lấy lịch làm việc",
       error: error.message,
       success: false,
     });
@@ -109,7 +251,9 @@ exports.assignTechnician = async (req, res) => {
       });
     }
 
-    const appointment = await Appointment.findById(appointment_id);
+    const appointment = await Appointment.findById(appointment_id).populate(
+      "service_type_id"
+    );
     if (!appointment) {
       return res.status(404).json({
         message: "Không tìm thấy appointment",
@@ -124,17 +268,49 @@ exports.assignTechnician = async (req, res) => {
       });
     }
 
-    const technician = await User.findById(technician_id);
-    if (!technician || technician.role !== "technician") {
-      return res.status(400).json({
-        message: "Technician không tồn tại hoặc không có quyền",
-        success: false,
-      });
+    // const technician = await User.findById(technician_id);
+    // if (!technician || technician.role !== "technical") {
+    //   return res.status(400).json({
+    //     message: "Technician không tồn tại hoặc không có quyền",
+    //     success: false,
+    //   });
+    // }
+
+    const technicianAppointments = await Appointment.find({
+      assigned: technician_id,
+      status: "in_progress",
+      estimated_end_time: { $ne: null },
+      _id: { $ne: appointment_id },
+    }).lean();
+
+    const BUFFER_HOURS = 1;
+    const newAppointmentTimeMinutes = timeToMinutes(
+      appointment.appoinment_time
+    );
+
+    for (const existingAppt of technicianAppointments) {
+      const endTimeWithBuffer = addBufferToTime(
+        existingAppt.estimated_end_time,
+        BUFFER_HOURS
+      );
+      const endTimeWithBufferMinutes = timeToMinutes(endTimeWithBuffer);
+
+      if (newAppointmentTimeMinutes < endTimeWithBufferMinutes) {
+        return res.status(400).json({
+          message: `Technician đang bận đến ${endTimeWithBuffer} (bao gồm buffer 1 tiếng)`,
+          success: false,
+          conflict: {
+            appointment_id: existingAppt._id,
+            estimated_end_time: existingAppt.estimated_end_time,
+            time_end_with_buffer: endTimeWithBuffer,
+          },
+        });
+      }
     }
 
     appointment.assigned_by = assignedBy;
     appointment.assigned = technician_id;
-    appointment.status = "accepted";
+    appointment.status = "assigned";
     await appointment.save();
 
     const updatedAppointment = await Appointment.findById(appointment_id)
@@ -169,7 +345,6 @@ exports.assignTechnician = async (req, res) => {
   }
 };
 
-// Lấy appointments của user hiện tại đang đăng nhập
 exports.getMyAppointments = async (req, res) => {
   try {
     const { page = 1, limit = 10, status } = req.query;
@@ -267,9 +442,10 @@ exports.updateAppointmentStatus = async (req, res) => {
       });
     }
 
-    const appointment = await Appointment.findById(appointment_id).populate(
-      "payment_id"
-    );
+    const appointment = await Appointment.findById(appointment_id)
+      .populate("payment_id")
+      .populate("service_type_id");
+
     if (!appointment) {
       return res.status(404).json({
         message: "Không tìm thấy appointment",
@@ -279,6 +455,24 @@ exports.updateAppointmentStatus = async (req, res) => {
 
     const oldStatus = appointment.status;
     appointment.status = status;
+
+    if (status === "in_progress" && oldStatus !== "in_progress") {
+      const estimatedDuration = appointment.service_type_id?.estimated_duration;
+
+      if (estimatedDuration) {
+        const actualStartTime = getCurrentTime();
+
+        appointment.appoinment_time = actualStartTime;
+
+        const durationHours = parseFloat(estimatedDuration);
+        const estimatedEndTime = calculateEndTime(
+          actualStartTime,
+          durationHours
+        );
+
+        appointment.estimated_end_time = estimatedEndTime;
+      }
+    }
 
     if (oldStatus === "pending" && status === "deposited") {
       const depositAmount = appointment.payment_id?.amount || 100000;
@@ -705,13 +899,15 @@ exports.validateAppointmentRules = async ({
   const BUFFER_MS = 5 * 60 * 1000;
   const newStart = buildLocalDateTime(appoinment_date, appoinment_time);
   const newEnd = new Date(
-    newStart.getTime() + parseDurationToMs(serviceType.estimated_duration) + BUFFER_MS
+    newStart.getTime() +
+    parseDurationToMs(serviceType.estimated_duration) +
+    BUFFER_MS
   );
 
-  const activeStatuses = ["pending", "in_progress"]; // trạng thái "đang hoạt động"
-  const finishedStatuses = ["completed", "cancelled"]; // trạng thái đã kết thúc
+  const activeStatuses = ["pending", "in_progress"];
+  const finishedStatuses = ["completed", "cancelled"];
 
-  // CASE 0: Cùng xe, cùng trung tâm, cùng dịch vụ, cùng ngày & giờ (bất kỳ trạng thái nào trừ cancelled/completed)
+  // Check trùng hoàn toàn
   const exactSame = existingAppointments.find(
     (a) =>
       a.center_id._id.toString() === center_id &&
@@ -725,7 +921,6 @@ exports.validateAppointmentRules = async ({
     return "Đã tồn tại lịch hẹn trùng hoàn toàn (trung tâm, xe, dịch vụ, ngày, giờ).";
   }
 
-  // CASE 1: Cùng trung tâm, xe, dịch vụ → tối đa 2 lần (chỉ tính pending/in_progress)
   const sameCombo = existingAppointments.filter(
     (a) =>
       a.center_id._id.toString() === center_id &&
@@ -738,7 +933,6 @@ exports.validateAppointmentRules = async ({
     return "Bạn chỉ có thể tạo tối đa 2 lịch đang hoạt động (pending/in_progress) cho cùng trung tâm, xe và dịch vụ.";
   }
 
-  // CASE 2: Trung tâm khác nhưng cùng giờ
   const sameTimeConflict = existingAppointments.find(
     (a) =>
       a.appoinment_date.toISOString().split("T")[0] === appoinment_date &&
@@ -751,7 +945,6 @@ exports.validateAppointmentRules = async ({
     return "Xe này đã có lịch ở trung tâm khác tại cùng thời điểm.";
   }
 
-  // CASE 3: Overlap theo estimated_duration (tính buffer)
   const overlapAppointment = existingAppointments.find((a) => {
     if (a.vehicle_id._id.toString() !== vehicle_id) return false;
 
@@ -762,7 +955,10 @@ exports.validateAppointmentRules = async ({
       (a.service_type_id && a.service_type_id.estimated_duration) ||
       a.estimated_duration;
 
-    const existingStart = buildLocalDateTime(existingDateStr, a.appoinment_time);
+    const existingStart = buildLocalDateTime(
+      existingDateStr,
+      a.appoinment_time
+    );
     const existingEnd = new Date(
       existingStart.getTime() +
       parseDurationToMs(existingDurationStr) +
@@ -779,7 +975,7 @@ exports.validateAppointmentRules = async ({
   if (overlapAppointment)
     return "Xe này đã có lịch trong khoảng thời gian này (bao gồm thời lượng dịch vụ).";
 
-  return null; // hợp lệ
+  return null;
 };
 
 exports.createDepositPayment = async (userId, appointmentId) => {
@@ -787,7 +983,10 @@ exports.createDepositPayment = async (userId, appointmentId) => {
   const description = `Tam ung ${appointmentId.toString().slice(-6)}`;
 
   let paymentResult = null;
-  const paymentReq = { _id: userId, body: { amount: depositAmount, description } };
+  const paymentReq = {
+    _id: userId,
+    body: { amount: depositAmount, description },
+  };
   const paymentRes = {
     status: (code) => ({
       json: (data) => {
@@ -810,7 +1009,11 @@ exports.createDepositPayment = async (userId, appointmentId) => {
     await fallback.save();
     paymentResult = {
       success: true,
-      data: { payment_id: fallback._id, order_code: orderCode, amount: depositAmount },
+      data: {
+        payment_id: fallback._id,
+        order_code: orderCode,
+        amount: depositAmount,
+      },
     };
   }
   return paymentResult;
@@ -819,9 +1022,9 @@ exports.createAppointment = async (req, res) => {
   try {
     const { appoinment_date, appoinment_time, notes, user_id, vehicle_id, center_id, service_type_id, technician_id } = req.body;
     const userId = req._id?.toString();
-    if (!userId) return res.status(401).json({ message: "Unauthorized", success: false });
+    if (!userId)
+      return res.status(401).json({ message: "Unauthorized", success: false });
 
-    // Validate entity tồn tại
     const [user, vehicle, serviceCenter, serviceType] = await Promise.all([
       User.findById(user_id),
       Vehicle.findById(vehicle_id),
@@ -829,16 +1032,24 @@ exports.createAppointment = async (req, res) => {
       ServiceType.findById(service_type_id),
     ]);
     if (!user || !vehicle || !serviceCenter || !serviceType)
-      return res.status(404).json({ message: "Thông tin không hợp lệ", success: false });
+      return res
+        .status(404)
+        .json({ message: "Thông tin không hợp lệ", success: false });
 
-    // Lấy danh sách lịch cũ
     const existingAppointments = await Appointment.find({
       user_id,
-      status: { $in: ["pending", "confirmed", "in_progress", "deposited", "completed", "paid"] },
-    })
-      .populate("service_type_id center_id vehicle_id");
+      status: {
+        $in: [
+          "pending",
+          "confirmed",
+          "in_progress",
+          "deposited",
+          "completed",
+          "paid",
+        ],
+      },
+    }).populate("service_type_id center_id vehicle_id");
 
-    // Check rule tổng hợp
     const ruleError = await exports.validateAppointmentRules({
       appoinment_date,
       appoinment_time,
@@ -853,7 +1064,6 @@ exports.createAppointment = async (req, res) => {
     // THÊM MỚI: nếu không chọn technician -> để null
     const selectedTechnician = technician_id && technician_id.trim() !== "" ? technician_id : null;
 
-    // Tạo appointment
     const appointment = new Appointment({
       appoinment_date: new Date(appoinment_date),
       appoinment_time,
@@ -868,8 +1078,10 @@ exports.createAppointment = async (req, res) => {
     });
     await appointment.save();
 
-    // Tạo link thanh toán
-    const paymentResult = await exports.createDepositPayment(userId, appointment._id);
+    const paymentResult = await exports.createDepositPayment(
+      userId,
+      appointment._id
+    );
     if (paymentResult?.success) {
       appointment.payment_id = paymentResult.data.payment_id;
       await appointment.save();
@@ -882,7 +1094,11 @@ exports.createAppointment = async (req, res) => {
     });
   } catch (error) {
     console.error("Create appointment error:", error);
-    return res.status(500).json({ message: "Lỗi tạo appointment", error: error.message, success: false });
+    return res.status(500).json({
+      message: "Lỗi tạo appointment",
+      error: error.message,
+      success: false,
+    });
   }
 };
 

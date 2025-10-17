@@ -126,8 +126,10 @@ router.get(
  *         description: Lỗi server
  */
 
-router.put("/update/:id", auth.authMiddleWare,
-  auth.requireRole('admin', 'technical', 'staff'),
+router.put(
+  "/update/:id",
+  auth.authMiddleWare,
+  auth.requireRole("admin", "technical", "staff"),
   service.updateService
 );
 /**
@@ -153,9 +155,11 @@ router.put("/update/:id", auth.authMiddleWare,
  *       500:
  *         description: Lỗi server
  */
-router.delete("/delete/:id", auth.authMiddleWare,
-  auth.requireRole('admin', 'technical', 'staff', 'customer'),
+router.delete(
+  "/delete/:id",
+  auth.authMiddleWare,
+  auth.requireRole("admin", "technical", "staff", "customer"),
   service.deleteService
-)
+);
 
 module.exports = router;

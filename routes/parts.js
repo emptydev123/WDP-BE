@@ -123,6 +123,8 @@ router.get("/:partId", auth.authMiddleWare, getPartById);
  *             type: object
  *             required:
  *               - part_name
+ *               - cost_price
+ *               - unit_price
  *             properties:
  *               part_number:
  *                 type: string
@@ -133,9 +135,12 @@ router.get("/:partId", auth.authMiddleWare, getPartById);
  *               description:
  *                 type: string
  *                 description: Mô tả
+ *               cost_price:
+ *                 type: number
+ *                 description: Giá gốc/giá nhập (required)
  *               unit_price:
- *                 type: string
- *                 description: Giá đơn vị
+ *                 type: number
+ *                 description: Giá bán (required)
  *               supplier:
  *                 type: string
  *                 description: Nhà cung cấp
@@ -185,9 +190,12 @@ router.post("/", auth.authMiddleWare, createPart);
  *               description:
  *                 type: string
  *                 description: Mô tả
+ *               cost_price:
+ *                 type: number
+ *                 description: Giá gốc/giá nhập
  *               unit_price:
- *                 type: string
- *                 description: Giá đơn vị
+ *                 type: number
+ *                 description: Giá bán
  *               supplier:
  *                 type: string
  *                 description: Nhà cung cấp

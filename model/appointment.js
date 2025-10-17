@@ -9,6 +9,9 @@ const appointmentSchema = new schema(
       type: String,
       require: true,
     },
+    estimated_end_time: {
+      type: String,
+    },
     status: {
       type: String,
       enum: [
