@@ -72,6 +72,12 @@ const appointmentSchema = new schema(
       ref: "ServiceType",
       required: false,
     },
+    technician_id: {
+      type: mongoose.Types.ObjectId,
+      ref: "User",
+      required: false,
+      default: null,
+    },
   },
   { timestamps: true }
 );

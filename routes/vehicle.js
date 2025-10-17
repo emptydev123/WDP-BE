@@ -186,4 +186,92 @@ router.get(
     vehicle.getAllVehicle
 );
 
+/**
+ * @swagger
+ * /api/vehicle/update/{id}:
+ *   put:
+ *     summary: Cập nhật thông tin xe của người dùng
+ *     tags: [Vehicles]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         required: true
+ *         description: ID của xe cần cập nhật
+ *         schema:
+ *           type: string
+ *           example: "671f0dca3b0c4b8f12f1a911"
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               color:
+ *                 type: string
+ *                 example: "Đỏ"
+ *               current_miliage:
+ *                 type: number
+ *                 example: 18000
+ *               battery_health:
+ *                 type: number
+ *                 example: 95
+ *               last_service_mileage:
+ *                 type: number
+ *                 example: 15000
+ *               purchase_date:
+ *                 type: string
+ *                 format: date
+ *                 example: "2024-10-01"
+ *     responses:
+ *       200:
+ *         description: Cập nhật xe thành công
+ *       400:
+ *         description: Xe đang có lịch hẹn hoạt động, không thể cập nhật
+ *       404:
+ *         description: Xe không tồn tại hoặc không thuộc về user này
+ *       500:
+ *         description: Lỗi server
+ */
+router.put(
+    '/update/:id',
+    auth.authMiddleWare,
+    auth.requireRole("admin", "staff", "customer"),
+    vehicle.updateVehicle
+);
+
+/**
+ * @swagger
+ * /api/vehicle/delete/{id}:
+ *   delete:
+ *     summary: Xóa xe của người dùng
+ *     tags: [Vehicles]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         required: true
+ *         description: ID của xe cần xóa
+ *         schema:
+ *           type: string
+ *           example: "671f0dca3b0c4b8f12f1a911"
+ *     responses:
+ *       200:
+ *         description: Xóa xe thành công
+ *       400:
+ *         description: Xe đang có lịch hẹn hoạt động, không thể xóa
+ *       404:
+ *         description: Xe không tồn tại hoặc không thuộc về user này
+ *       500:
+ *         description: Lỗi server
+ */
+router.delete(
+    '/delete/:id',
+    auth.authMiddleWare,
+    auth.requireRole("admin", "customer", "staff"),
+    vehicle.deleteVehicle
+);
 module.exports = router;

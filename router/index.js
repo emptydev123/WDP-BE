@@ -19,6 +19,6 @@ router.use("/appointment", appointmentRouter);
 router.use('/service-center', serviceCenterRouter)
 router.use("/inventory", inventoryRouter);
 router.use("/parts", partsRouter);
-router.use("/service-centers", serviceCenterRouter);
+
 
 module.exports = router;

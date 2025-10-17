@@ -817,7 +817,7 @@ exports.createDepositPayment = async (userId, appointmentId) => {
 };
 exports.createAppointment = async (req, res) => {
   try {
-    const { appoinment_date, appoinment_time, notes, user_id, vehicle_id, center_id, service_type_id } = req.body;
+    const { appoinment_date, appoinment_time, notes, user_id, vehicle_id, center_id, service_type_id, technician_id } = req.body;
     const userId = req._id?.toString();
     if (!userId) return res.status(401).json({ message: "Unauthorized", success: false });
 
@@ -850,6 +850,9 @@ exports.createAppointment = async (req, res) => {
     });
     if (ruleError) return res.status(400).json({ message: ruleError, success: false });
 
+    // THÊM MỚI: nếu không chọn technician -> để null
+    const selectedTechnician = technician_id && technician_id.trim() !== "" ? technician_id : null;
+
     // Tạo appointment
     const appointment = new Appointment({
       appoinment_date: new Date(appoinment_date),
@@ -861,6 +864,7 @@ exports.createAppointment = async (req, res) => {
       center_id,
       service_type_id,
       status: "pending",
+      technician_id: selectedTechnician,
     });
     await appointment.save();
 
@@ -881,6 +885,7 @@ exports.createAppointment = async (req, res) => {
     return res.status(500).json({ message: "Lỗi tạo appointment", error: error.message, success: false });
   }
 };
+
 
 
 

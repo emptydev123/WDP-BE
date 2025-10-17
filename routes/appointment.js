@@ -161,7 +161,7 @@ router.get(
  * @swagger
  * /api/appointment/create:
  *   post:
- *     summary: Tạo appointment mới (có kiểm tra điều kiện nâng cao)
+ *     summary: Tạo appointment mới (có kiểm tra điều kiện nâng cao + chọn kỹ thuật viên tùy chọn)
  *     tags: [Appointments]
  *     security:
  *       - bearerAuth: []
@@ -208,6 +208,10 @@ router.get(
  *                 type: string
  *                 example: "66e0f04908abb1b3a1334e56"
  *                 description: ID loại dịch vụ bảo dưỡng (bắt buộc)
+ *               technician_id:
+ *                 type: string
+ *                 example: "670a5c290fa49362a0536e27"
+ *                 description: ID kỹ thuật viên được chọn (optional – có thể bỏ trống)
  *     responses:
  *       201:
  *         description: Tạo appointment thành công (đã tạo payment tạm ứng 2000 VND)
@@ -248,6 +252,9 @@ router.get(
  *                     service_type_id:
  *                       type: object
  *                       description: Thông tin loại dịch vụ
+ *                     technician_id:
+ *                       type: object
+ *                       description: Kỹ thuật viên được chỉ định (nếu có)
  *                     payment_id:
  *                       type: object
  *                       description: Thông tin thanh toán tạm ứng
@@ -272,6 +279,7 @@ router.post(
   auth.requireRole("customer", "admin", "staff", "technical"),
   appointment.createAppointment
 );
+
 
 
 /**
