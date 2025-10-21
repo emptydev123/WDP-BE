@@ -165,7 +165,13 @@ exports.getAppointments = async (req, res) => {
 
 exports.getTechnicianSchedule = async (req, res) => {
   try {
-    const { technician_id, date } = req.query;
+    const {
+      technician_id,
+      date_from,
+      date_to,
+      page = 1,
+      limit = 10,
+    } = req.query;
     const userId = req._id?.toString();
 
     if (!userId) {
@@ -175,53 +181,137 @@ exports.getTechnicianSchedule = async (req, res) => {
       });
     }
 
-    if (!technician_id || !date) {
+    // Kiểm tra tham số bắt buộc
+    if (!date_from || !date_to) {
       return res.status(400).json({
-        message: "Thiếu technician_id hoặc date",
+        message: "Thiếu date_from hoặc date_to",
         success: false,
       });
     }
 
-    const technician = await User.findById(technician_id);
-    if (!technician || technician.role !== "technical") {
-      return res.status(404).json({
-        message: "Technician không tồn tại",
+    // Xác thực khoảng thời gian
+    const fromDate = new Date(date_from);
+    const toDate = new Date(date_to);
+    fromDate.setHours(0, 0, 0, 0);
+    toDate.setHours(23, 59, 59, 999);
+
+    if (fromDate > toDate) {
+      return res.status(400).json({
+        message: "date_from không được lớn hơn date_to",
         success: false,
       });
     }
 
-    const targetDate = new Date(date);
-    const startOfDay = new Date(targetDate);
-    startOfDay.setHours(0, 0, 0, 0);
-    const endOfDay = new Date(targetDate);
-    endOfDay.setHours(23, 59, 59, 999);
+    // Nếu có technician_id - lấy chi tiết lịch của technician cụ thể
+    if (technician_id) {
+      const technician = await User.findById(technician_id);
+      if (!technician || technician.role !== "technician") {
+        return res.status(404).json({
+          message: "Technician không tồn tại",
+          success: false,
+        });
+      }
 
-    const schedules = await Appointment.find({
-      assigned: technician_id,
-      appoinment_date: {
-        $gte: startOfDay,
-        $lte: endOfDay,
-      },
-      status: { $in: ["accepted", "assigned", "in_progress"] },
-    })
-      .select("appoinment_time estimated_end_time status")
-      .sort({ appoinment_time: 1 })
+      const schedules = await Appointment.find({
+        assigned: technician_id,
+        appoinment_date: {
+          $gte: fromDate,
+          $lte: toDate,
+        },
+        status: { $in: ["accepted", "assigned", "in_progress", "completed"] },
+      })
+        .populate("user_id", "fullName phone")
+        .populate("vehicle_id", "license_plate brand model")
+        .populate("center_id", "center_name address")
+        .populate("service_type_id", "service_name estimated_duration")
+        .select(
+          "appoinment_date appoinment_time estimated_end_time status notes estimated_cost"
+        )
+        .sort({ appoinment_date: 1, appoinment_time: 1 })
+        .lean();
+
+      return res.status(200).json({
+        message: "Lấy lịch làm việc của technician thành công",
+        success: true,
+        data: {
+          technician: {
+            _id: technician._id,
+            fullName: technician.fullName,
+            email: technician.email,
+            phone: technician.phone,
+          },
+          date_range: {
+            from: date_from,
+            to: date_to,
+          },
+          schedules,
+          total_assignments: schedules.length,
+        },
+      });
+    }
+
+    // Nếu không có technician_id - lấy danh sách tất cả technician
+    const { page: validatedPage, limit: validatedLimit } = validatePagination(
+      page,
+      limit
+    );
+
+    // Lấy danh sách tất cả technician
+    const totalTechnicians = await User.countDocuments({ role: "technician" });
+    const pagination = createPagination(
+      validatedPage,
+      validatedLimit,
+      totalTechnicians
+    );
+
+    const technicians = await User.find({ role: "technician" })
+      .select("_id fullName email phone")
+      .skip(pagination.skip)
+      .limit(pagination.limit)
       .lean();
 
-    return res.status(200).json({
-      message: "Lấy lịch làm việc của technician thành công",
-      success: true,
-      data: {
-        technician: {
-          _id: technician._id,
-          fullName: technician.fullName,
-        },
-        date,
-        schedules,
-        is_available: schedules.length === 0,
-        total_assignments: schedules.length,
-      },
-    });
+    // Lấy lịch làm việc cho từng technician
+    const techniciansWithSchedules = await Promise.all(
+      technicians.map(async (technician) => {
+        const schedules = await Appointment.find({
+          assigned: technician._id,
+          appoinment_date: {
+            $gte: fromDate,
+            $lte: toDate,
+          },
+          status: { $in: ["accepted", "assigned", "in_progress", "completed"] },
+        })
+          .populate("user_id", "fullName phone")
+          .populate("vehicle_id", "license_plate brand model")
+          .populate("center_id", "center_name address")
+          .populate("service_type_id", "service_name estimated_duration")
+          .select(
+            "appoinment_date appoinment_time estimated_end_time status notes estimated_cost"
+          )
+          .sort({ appoinment_date: 1, appoinment_time: 1 })
+          .lean();
+
+        return {
+          technician,
+          schedules,
+          total_assignments: schedules.length,
+        };
+      })
+    );
+
+    const response = createPaginatedResponse(
+      techniciansWithSchedules,
+      pagination,
+      "Lấy danh sách lịch làm việc của tất cả technician thành công"
+    );
+
+    // Thêm thông tin khoảng thời gian vào response
+    response.data.date_range = {
+      from: date_from,
+      to: date_to,
+    };
+
+    return res.status(200).json(response);
   } catch (error) {
     console.error("Get technician schedule error:", error);
     return res.status(500).json({
