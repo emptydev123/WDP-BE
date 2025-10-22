@@ -105,7 +105,7 @@ router.post("/login", user.login);
 router.get(
   "/getprofile",
   auth.authMiddleWare,
-  auth.requireRole("customer", "staff", "admin"),
+  auth.requireRole("customer", "staff", "admin", "technician"),
   user.getProfileUser
 );
 
