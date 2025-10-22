@@ -56,7 +56,7 @@ const auth = require("../middlewares/auth");
 router.post(
   "/create",
   auth.authMiddleWare,
-  auth.requireRole("admin", "staff"),
+  auth.requireRole("admin", "staff", "customer"),
   serviceCenter.createServiceCenter
 );
 
@@ -182,4 +182,134 @@ router.get(
   serviceCenter.getAllServiceCenters
 );
 
+/**
+ * @swagger
+ * /api/service-center/update/{id}:
+ *   put:
+ *     summary: Cập nhật thông tin trung tâm dịch vụ
+ *     tags: [Service Center]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         description: ID của trung tâm cần cập nhật
+ *         required: true
+ *         schema:
+ *           type: string
+ *           example: "670feebd8b5326fbe3a9b1a7"
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               center_name:
+ *                 type: string
+ *                 example: "EV Sài Gòn"
+ *               address:
+ *                 type: string
+ *                 example: "123 Nguyễn Văn Cừ, Quận 5, TP.HCM"
+ *               phone:
+ *                 type: string
+ *                 example: "0901234567"
+ *               email:
+ *                 type: string
+ *                 example: "contact@evsaigon.vn"
+ *               is_active:
+ *                 type: boolean
+ *                 example: true
+ *     responses:
+ *       200:
+ *         description: Cập nhật trung tâm thành công
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: "Cập nhật trung tâm thành công"
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     _id:
+ *                       type: string
+ *                       example: "670feebd8b5326fbe3a9b1a7"
+ *                     center_name:
+ *                       type: string
+ *                       example: "EV Sài Gòn"
+ *                     address:
+ *                       type: string
+ *                       example: "123 Nguyễn Văn Cừ, Quận 5, TP.HCM"
+ *                     phone:
+ *                       type: string
+ *                       example: "0901234567"
+ *                     email:
+ *                       type: string
+ *                       example: "contact@evsaigon.vn"
+ *                     is_active:
+ *                       type: boolean
+ *                       example: true
+ *       400:
+ *         description: Không thể cập nhật do đã có lịch hẹn
+ *       404:
+ *         description: Không tìm thấy trung tâm
+ *       500:
+ *         description: Lỗi server khi cập nhật trung tâm
+ */
+router.put(
+  "/update/:id",
+  auth.authMiddleWare,
+  auth.requireRole("customer", "admin", "staff"),
+  serviceCenter.updateServiceCenter
+);
+
+/**
+ * @swagger
+ * /api/service-center/delete/{id}:
+ *   delete:
+ *     summary: Xóa trung tâm dịch vụ
+ *     tags: [Service Center]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         description: ID của trung tâm cần xóa
+ *         required: true
+ *         schema:
+ *           type: string
+ *           example: "670feebd8b5326fbe3a9b1a7"
+ *     responses:
+ *       200:
+ *         description: Xóa trung tâm thành công
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: "Xóa trung tâm thành công"
+ *       400:
+ *         description: Không thể xóa trung tâm vì đã có lịch hẹn
+ *       404:
+ *         description: Không tìm thấy trung tâm
+ *       500:
+ *         description: Lỗi server khi xóa trung tâm
+ */
+router.delete(
+  "/delete/:id",
+  auth.authMiddleWare,
+  auth.requireRole("customer", "admin", "staff"),
+  serviceCenter.deleteServiceCenter
+);
 module.exports = router;

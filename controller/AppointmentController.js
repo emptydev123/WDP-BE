@@ -990,8 +990,8 @@ exports.validateAppointmentRules = async ({
   const newStart = buildLocalDateTime(appoinment_date, appoinment_time);
   const newEnd = new Date(
     newStart.getTime() +
-      parseDurationToMs(serviceType.estimated_duration) +
-      BUFFER_MS
+    parseDurationToMs(serviceType.estimated_duration) +
+    BUFFER_MS
   );
 
   const activeStatuses = ["pending", "in_progress"];
@@ -1051,8 +1051,8 @@ exports.validateAppointmentRules = async ({
     );
     const existingEnd = new Date(
       existingStart.getTime() +
-        parseDurationToMs(existingDurationStr) +
-        BUFFER_MS
+      parseDurationToMs(existingDurationStr) +
+      BUFFER_MS
     );
 
     const overlap =
@@ -1110,15 +1110,7 @@ exports.createDepositPayment = async (userId, appointmentId) => {
 };
 exports.createAppointment = async (req, res) => {
   try {
-    const {
-      appoinment_date,
-      appoinment_time,
-      notes,
-      user_id,
-      vehicle_id,
-      center_id,
-      service_type_id,
-    } = req.body;
+    const { appoinment_date, appoinment_time, notes, user_id, vehicle_id, center_id, service_type_id, technician_id } = req.body;
     const userId = req._id?.toString();
     if (!userId)
       return res.status(401).json({ message: "Unauthorized", success: false });
@@ -1157,8 +1149,10 @@ exports.createAppointment = async (req, res) => {
       serviceType,
       existingAppointments,
     });
-    if (ruleError)
-      return res.status(400).json({ message: ruleError, success: false });
+    if (ruleError) return res.status(400).json({ message: ruleError, success: false });
+
+    // THÊM MỚI: nếu không chọn technician -> để null
+    const selectedTechnician = technician_id && technician_id.trim() !== "" ? technician_id : null;
 
     const appointment = new Appointment({
       appoinment_date: new Date(appoinment_date),
@@ -1170,6 +1164,7 @@ exports.createAppointment = async (req, res) => {
       center_id,
       service_type_id,
       status: "pending",
+      technician_id: selectedTechnician,
     });
     await appointment.save();
 
@@ -1196,3 +1191,8 @@ exports.createAppointment = async (req, res) => {
     });
   }
 };
+
+
+
+
+
