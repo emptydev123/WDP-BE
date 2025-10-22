@@ -113,10 +113,32 @@ router.get(
  * @swagger
  * /api/users/getallprofile:
  *   get:
- *     summary: Lấy tất cả user (chỉ admin)
+ *     summary: Lấy tất cả user (có thể filter theo role)
  *     tags: [Users]
- *     security:
- *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: role
+ *         schema:
+ *           type: string
+ *           enum: [ staff, technician]
+ *         description: Lọc theo role (mặc định là customer nếu không có tham số)
+ *       - in: query
+ *         name: id
+ *         schema:
+ *           type: string
+ *         description: Lọc theo ID cụ thể của user (optional)
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *         description: Số trang
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 10
+ *         description: Số item per page
  *     responses:
  *       200:
  *         description: Lấy danh sách users thành công
@@ -125,22 +147,48 @@ router.get(
  *             schema:
  *               type: object
  *               properties:
- *                 users:
- *                   type: array
- *                 count:
- *                   type: integer
- *                   example: 10
- *       401:
- *         description: Unauthorized / Token invalid
- *       403:
- *         description: Forbidden (không phải admin)
+ *                 message:
+ *                   type: string
+ *                 success:
+ *                   type: boolean
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     users:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           _id:
+ *                             type: string
+ *                           username:
+ *                             type: string
+ *                           fullName:
+ *                             type: string
+ *                           email:
+ *                             type: string
+ *                           phone:
+ *                             type: string
+ *                           role:
+ *                             type: string
+ *                           createdAt:
+ *                             type: string
+ *                             format: date-time
+ *                     pagination:
+ *                       type: object
+ *                       properties:
+ *                         current_page:
+ *                           type: integer
+ *                         total_pages:
+ *                           type: integer
+ *                         total_items:
+ *                           type: integer
+ *                         items_per_page:
+ *                           type: integer
+ *       500:
+ *         description: Lỗi server
  */
-router.get(
-  "/getallprofile",
-  auth.authMiddleWare,
-  auth.requireRole("admin"),
-  user.getAllProfileUsers
-);
+router.get("/getallprofile", user.getAllProfileUsers);
 
 /**
  * @swagger
