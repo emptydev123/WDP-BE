@@ -124,7 +124,7 @@ router.get(
  *                 description: Danh sách parts đã sử dụng (optional)
  *     responses:
  *       201:
- *         description: Created
+ *         description: Created (Issue report created and appointment status updated to completed)
  *       400:
  *         description: Bad request
  *       403:

@@ -489,7 +489,7 @@ router.put(
 router.put(
   "/update-status",
   auth.authMiddleWare,
-  auth.requireRole("customer", "staff", "admin"),
+  auth.requireRole("customer", "staff", "admin", "technician"),
   appointment.updateAppointmentStatus
 );
 

@@ -178,8 +178,14 @@ exports.createIssueReport = async (req, res) => {
       { path: "parts_used.part_id" },
     ]);
 
+    await Appointment.findByIdAndUpdate(
+      appointment_id,
+      { status: "completed" },
+      { new: true }
+    );
+
     return res.status(201).json({
-      message: "Tạo issue report thành công",
+      message: "Tạo issue report thành công và cập nhật appointment status",
       success: true,
       data: issueReport,
     });
