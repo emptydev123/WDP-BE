@@ -7,6 +7,11 @@ const nodemailer = require("nodemailer");
 const { v4: uuidv4 } = require("uuid");
 const { cacheGet, cacheSet, cacheDel } = require("../services/redis");
 const crypto = require("crypto");
+const {
+  createPagination,
+  createPaginatedResponse,
+  validatePagination,
+} = require("../utils/pagination");
 
 exports.registerUser = async (req, res) => {
   try {
@@ -130,20 +135,56 @@ exports.getProfileUser = async (req, res) => {
 };
 
 exports.getAllProfileUsers = async (req, res) => {
-  const key = "users:all";
   try {
-    const cached = await cacheGet(key);
-    if (cached) return res.status(200).json(cached);
+    const { role, id, page = 1, limit = 10 } = req.query;
 
-    const users = await User.find()
-      .select("-password -verifyToken -verifyTokenExpires")
+    const { page: validatedPage, limit: validatedLimit } = validatePagination(
+      page,
+      limit
+    );
+    const query = {};
+    if (id) {
+      query._id = id;
+    } else {
+      query.role = role || "customer";
+    }
+    const cacheKey = `users:all:${
+      id ? `id:${id}` : `role:${role || "customer"}`
+    }:${validatedPage}:${validatedLimit}`;
+
+    const cached = await cacheGet(cacheKey);
+    if (cached) {
+      return res.status(200).json(cached);
+    }
+
+    const total = await User.countDocuments(query);
+    const pagination = createPagination(validatedPage, validatedLimit, total);
+
+    const users = await User.find(query)
+      .select(
+        "-password -verifyToken -verifyTokenExpires -resetToken -resetTokenExpires"
+      )
+      .sort({ createdAt: -1 })
+      .skip(pagination.skip)
+      .limit(pagination.limit)
       .lean();
-    const payload = { users, count: users.length };
 
-    await cacheSet(key, payload, 120);
-    return res.status(201).json(payload);
-  } catch (e) {
-    return res.status(500).json({ message: "Server Error", error: e.message });
+    const response = createPaginatedResponse(
+      users,
+      pagination,
+      "Lấy danh sách users thành công"
+    );
+
+    await cacheSet(cacheKey, response, 120);
+
+    return res.status(200).json(response);
+  } catch (error) {
+    console.error("Get all profile users error:", error);
+    return res.status(500).json({
+      message: "Lỗi lấy danh sách users",
+      error: error.message,
+      success: false,
+    });
   }
 };
 
@@ -173,7 +214,6 @@ exports.loginGoogle = async (req, res) => {
       { expiresIn: "1h" }
     );
 
-    // Nếu là user mới, bust cache
     if (isNew) {
       await cacheDel("users:all");
       await cacheDel(`users:${user._id}`);
