@@ -7,6 +7,7 @@ var logger = require("morgan");
 const dbConnect = require("./DB/db");
 const routes = require("./router");
 const { connectRedis } = require("./services/redis");
+const { checkDueReminders } = require("./job/reminderJob")
 var app = express();
 // Initialize Redis (non-blocking)
 connectRedis().catch((err) => console.error("Redis init failed:", err));
@@ -33,6 +34,7 @@ app.use(
 // connect DB
 dbConnect();
 app.use("/api", routes);
+checkDueReminders();
 // swagger
 swaggerDocs(app);
 // catch 404 and forward to error handler

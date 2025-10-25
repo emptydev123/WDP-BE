@@ -2,6 +2,7 @@ var Vehicle = require('../model/vehicle');
 var VehicleModel = require('../model/vehicleModel')
 var Appointment = require('../model/appointment')
 const mongoose = require('mongoose')
+const { createMaintenanceReminderForVehicle } = require("../utils/reminder")
 // Create Vehicle Model
 exports.createVehicleModel = async (req, res) => {
     try {
@@ -52,6 +53,8 @@ exports.createVehicle = async (req, res) => {
         });
 
         await newVehicle.save();
+        //  Tạo reminder sau khi tạo xe
+        await createMaintenanceReminderForVehicle(newVehicle)
 
         return res.status(201).json({
             success: true,
