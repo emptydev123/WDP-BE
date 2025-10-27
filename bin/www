@@ -7,6 +7,10 @@
 var app = require('../app');
 var debug = require('debug')('vehicle-be:server');
 var http = require('http');
+const { initializeSocketServer } = require('../socket/socket');  // Import socket.js
+const { setIoInstance } = require('../socket/reminderEvent');  // Import setIoInstance
+const { checkDueReminders } = require('../job/reminderJob');  // Import reminder job
+
 
 /**
  * Get port from environment and store in Express.
@@ -20,14 +24,24 @@ app.set('port', port);
  */
 
 var server = http.createServer(app);
+const io = initializeSocketServer(server);
+setIoInstance(io);  // Set io instance sau khi khởi tạo xong
 
 /**
  * Listen on provided port, on all network interfaces.
  */
 
-server.listen(port);
+server.listen(port, () => {
+  console.log(`Server is running ${port}`)
+});
+
 server.on('error', onError);
-server.on('listening', onListening);
+server.on('listening', () => {
+  onListening();
+  // Initialize reminder job after server is ready
+  checkDueReminders();
+  console.log('Reminder job initialized');
+});
 
 /**
  * Normalize a port into a number, string, or false.

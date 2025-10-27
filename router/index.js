@@ -11,7 +11,7 @@ const inventoryRouter = require("../routes/inventory");
 const partsRouter = require("../routes/parts");
 const issueTypeRouter = require("../routes/issueType");
 const issueReportRouter = require("../routes/issueReport");
-
+const notificationRouter = require('../routes/notification');
 router.use("/users", userRouter);
 router.use("/service", serviceRouter);
 router.use("/vehicle", vehicleRouter);
@@ -23,6 +23,6 @@ router.use("/parts", partsRouter);
 router.use("/service-centers", serviceCenterRouter);
 router.use("/issue-types", issueTypeRouter);
 router.use("/issue-reports", issueReportRouter);
-
+router.use("/notifications", notificationRouter);
 
 module.exports = router;
