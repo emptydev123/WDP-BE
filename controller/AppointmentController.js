@@ -75,7 +75,7 @@ exports.getAppointments = async (req, res) => {
         $gte: startOfToday,
         $lte: endOfToday,
       };
-      query.status = { $in: ["in_progress", "assigned", "accepted"] };
+      query.status = { $in: ["in_progress", "assigned", "check_in"] };
       query.technician_id = { $ne: null };
     }
 
@@ -218,7 +218,9 @@ exports.getTechnicianSchedule = async (req, res) => {
           $gte: fromDate,
           $lte: toDate,
         },
-        status: { $in: ["accepted", "assigned", "in_progress", "completed"] },
+        status: {
+          $in: ["check_in", "assigned", "in_progress", "repaired", "completed"],
+        },
       })
         .populate("user_id", "fullName phone")
         .populate("vehicle_id", "license_plate brand model")
@@ -279,7 +281,15 @@ exports.getTechnicianSchedule = async (req, res) => {
             $gte: fromDate,
             $lte: toDate,
           },
-          status: { $in: ["accepted", "assigned", "in_progress", "completed"] },
+          status: {
+            $in: [
+              "check_in",
+              "assigned",
+              "in_progress",
+              "repaired",
+              "completed",
+            ],
+          },
         })
           .populate("user_id", "fullName phone")
           .populate("vehicle_id", "license_plate brand model")
@@ -517,17 +527,18 @@ exports.updateAppointmentStatus = async (req, res) => {
 
     const validStatuses = [
       "pending",
-      "accepted",
-      "deposited",
+      "assigned",
+      "check_in",
       "in_progress",
+      "repaired",
       "completed",
-      "paid",
+      "delay",
       "canceled",
     ];
     if (!validStatuses.includes(status)) {
       return res.status(400).json({
         message:
-          "Status không hợp lệ. Chỉ chấp nhận: pending, accepted, deposited, in_progress, completed, paid, canceled",
+          "Status không hợp lệ. Chỉ chấp nhận: pending, assigned, check_in, in_progress, repaired, completed, delay, canceled",
         success: false,
       });
     }
@@ -562,18 +573,6 @@ exports.updateAppointmentStatus = async (req, res) => {
 
         appointment.estimated_end_time = estimatedEndTime;
       }
-    }
-
-    if (oldStatus === "pending" && status === "deposited") {
-      const depositAmount = appointment.payment_id?.amount || 100000;
-      appointment.estimated_cost = Math.max(
-        0,
-        appointment.estimated_cost - depositAmount
-      );
-    }
-
-    if (status === "paid") {
-      appointment.estimated_cost = 0;
     }
 
     await appointment.save();
@@ -1139,11 +1138,11 @@ exports.createAppointment = async (req, res) => {
       status: {
         $in: [
           "pending",
-          "confirmed",
+          "assigned",
+          "check_in",
           "in_progress",
-          "deposited",
+          "repaired",
           "completed",
-          "paid",
         ],
       },
     }).populate("service_type_id center_id vehicle_id");

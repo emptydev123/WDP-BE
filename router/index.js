@@ -11,6 +11,8 @@ const inventoryRouter = require("../routes/inventory");
 const partsRouter = require("../routes/parts");
 const issueTypeRouter = require("../routes/issueType");
 const checklistRouter = require("../routes/checklist");
+const checkinRouter = require("../routes/checkin");
+const dashboardRouter = require("../routes/dashboard");
 const PaymentController = require("../controller/PaymentController");
 
 // Webhook endpoint cho PayOS (không cần auth)
@@ -27,5 +29,7 @@ router.use("/parts", partsRouter);
 router.use("/service-centers", serviceCenterRouter);
 router.use("/issue-types", issueTypeRouter);
 router.use("/checklist", checklistRouter);
+router.use("/checkin", checkinRouter);
+router.use("/dashboard", dashboardRouter);
 
 module.exports = router;
