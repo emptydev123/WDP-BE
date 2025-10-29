@@ -11,16 +11,6 @@ const partSchema = new schema(
     description: {
       type: String,
     },
-    cost_price: {
-      type: Number,
-      required: true,
-      // Giá gốc/giá nhập
-    },
-    unit_price: {
-      type: Number,
-      required: true,
-      // Giá bán
-    },
     supplier: {
       type: String,
     },

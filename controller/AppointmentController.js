@@ -58,7 +58,7 @@ exports.getAppointments = async (req, res) => {
       query.center_id = service_center_id;
     }
     if (technician_id) {
-      query.assigned = technician_id;
+      query.technician_id = technician_id;
     }
     if (customer_id) {
       query.user_id = customer_id;
@@ -76,7 +76,7 @@ exports.getAppointments = async (req, res) => {
         $lte: endOfToday,
       };
       query.status = { $in: ["in_progress", "assigned", "accepted"] };
-      query.assigned = { $ne: null };
+      query.technician_id = { $ne: null };
     }
 
     if (date) {
@@ -115,8 +115,8 @@ exports.getAppointments = async (req, res) => {
       .populate("user_id", "username fullName email phone")
       .populate("center_id", "center_name address phone")
       .populate("vehicle_id", "license_plate vin")
-      .populate("assigned_by", "username fullName email phone role")
-      .populate("assigned", "username fullName email phone role")
+      .populate("staff_id", "username fullName email phone role")
+      .populate("technician_id", "username fullName email phone role")
       .populate("payment_id", "order_code amount status checkout_url qr_code")
       .populate(
         "final_payment_id",
@@ -274,7 +274,7 @@ exports.getTechnicianSchedule = async (req, res) => {
     const techniciansWithSchedules = await Promise.all(
       technicians.map(async (technician) => {
         const schedules = await Appointment.find({
-          assigned: technician._id,
+          technician_id: technician._id,
           appoinment_date: {
             $gte: fromDate,
             $lte: toDate,
@@ -325,9 +325,9 @@ exports.getTechnicianSchedule = async (req, res) => {
 exports.assignTechnician = async (req, res) => {
   try {
     const { appointment_id, technician_id } = req.body;
-    const assignedBy = req._id?.toString();
+    const staffId = req._id?.toString();
 
-    if (!assignedBy) {
+    if (!staffId) {
       return res.status(401).json({
         message: "Unauthorized",
         success: false,
@@ -351,7 +351,7 @@ exports.assignTechnician = async (req, res) => {
       });
     }
 
-    if (appointment.assigned) {
+    if (appointment.technician_id) {
       return res.status(400).json({
         message: "Appointment đã được assign cho technician khác",
         success: false,
@@ -367,7 +367,7 @@ exports.assignTechnician = async (req, res) => {
     // }
 
     const technicianAppointments = await Appointment.find({
-      assigned: technician_id,
+      technician_id: technician_id,
       status: "in_progress",
       estimated_end_time: { $ne: null },
       _id: { $ne: appointment_id },
@@ -398,8 +398,8 @@ exports.assignTechnician = async (req, res) => {
       }
     }
 
-    appointment.assigned_by = assignedBy;
-    appointment.assigned = technician_id;
+    appointment.staff_id = staffId;
+    appointment.technician_id = technician_id;
     appointment.status = "assigned";
     await appointment.save();
 
@@ -407,8 +407,8 @@ exports.assignTechnician = async (req, res) => {
       .populate("user_id", "username fullName email phone")
       .populate("center_id", "name address phone")
       .populate("vehicle_id", "license_plate brand model year")
-      .populate("assigned_by", "username fullName email phone role")
-      .populate("assigned", "username fullName email phone role")
+      .populate("staff_id", "username fullName email phone role")
+      .populate("technician_id", "username fullName email phone role")
       .populate("payment_id", "order_code amount status checkout_url qr_code")
       .populate(
         "final_payment_id",
@@ -464,8 +464,8 @@ exports.getMyAppointments = async (req, res) => {
       .populate("user_id", "username fullName email phone")
       .populate("center_id", "name address phone")
       .populate("vehicle_id", "license_plate brand model year")
-      .populate("assigned_by", "username fullName email phone role")
-      .populate("assigned", "username fullName email phone role")
+      .populate("staff_id", "username fullName email phone role")
+      .populate("technician_id", "username fullName email phone role")
       .populate("payment_id", "order_code amount status checkout_url qr_code")
       .populate(
         "final_payment_id",
@@ -615,8 +615,8 @@ exports.getAppointmentById = async (req, res) => {
       .populate("user_id", "username fullName email phone address")
       .populate("center_id", "name address phone")
       .populate("vehicle_id", "license_plate brand model year color")
-      .populate("assigned_by", "username fullName email phone role")
-      .populate("assigned", "username fullName email phone role")
+      .populate("staff_id", "username fullName email phone role")
+      .populate("technician_id", "username fullName email phone role")
       .populate("payment_id", "order_code amount status checkout_url qr_code")
       .populate(
         "final_payment_id",
@@ -689,8 +689,8 @@ exports.getAppointmentsByUsername = async (req, res) => {
       .populate("user_id", "username fullName email phone")
       .populate("center_id", "name address phone")
       .populate("vehicle_id", "license_plate brand model year")
-      .populate("assigned_by", "username fullName email phone role")
-      .populate("assigned", "username fullName email phone role")
+      .populate("staff_id", "username fullName email phone role")
+      .populate("technician_id", "username fullName email phone role")
       .populate("payment_id", "order_code amount status checkout_url qr_code")
       .populate(
         "final_payment_id",
@@ -750,7 +750,7 @@ exports.getAppointmentsByTechnician = async (req, res) => {
       limit
     );
 
-    const query = { assigned: technicianId };
+    const query = { technician_id: technicianId };
     if (status) {
       query.status = status;
     }
@@ -763,8 +763,8 @@ exports.getAppointmentsByTechnician = async (req, res) => {
       .populate("user_id", "username fullName email phone")
       .populate("center_id", "name address phone")
       .populate("vehicle_id", "license_plate brand model year")
-      .populate("assigned_by", "username fullName email phone role")
-      .populate("assigned", "username fullName email phone role")
+      .populate("staff_id", "username fullName email phone role")
+      .populate("technician_id", "username fullName email phone role")
       .populate("payment_id", "order_code amount status checkout_url qr_code")
       .populate(
         "final_payment_id",

@@ -1,6 +1,6 @@
 // controller/IssueTypeController.js
 const IssueType = require("../model/issueType");
-const IssueReport = require("../model/issueReport");
+const Checklist = require("../model/checklist");
 
 const {
   createPagination,
@@ -221,13 +221,13 @@ exports.deleteIssueType = async (req, res) => {
       });
     }
 
-    const reportCount = await IssueReport.countDocuments({
+    const reportCount = await Checklist.countDocuments({
       issue_type_id: issueTypeId,
     });
 
     if (reportCount > 0) {
       return res.status(400).json({
-        message: `Không thể xóa issue type vì có ${reportCount} issue reports đang sử dụng`,
+        message: `Không thể xóa issue type vì có ${reportCount} checklists đang sử dụng`,
         success: false,
       });
     }

@@ -115,15 +115,8 @@ exports.getPartById = async (req, res) => {
 // Tạo part mới
 exports.createPart = async (req, res) => {
   try {
-    const {
-      part_number,
-      part_name,
-      description,
-      cost_price,
-      unit_price,
-      supplier,
-      warranty_month,
-    } = req.body;
+    const { part_number, part_name, description, supplier, warranty_month } =
+      req.body;
     const userId = req._id?.toString();
 
     if (!userId) {
@@ -136,20 +129,6 @@ exports.createPart = async (req, res) => {
     if (!part_name) {
       return res.status(400).json({
         message: "Thiếu tên part",
-        success: false,
-      });
-    }
-
-    if (!cost_price) {
-      return res.status(400).json({
-        message: "Thiếu giá gốc (cost_price)",
-        success: false,
-      });
-    }
-
-    if (!unit_price) {
-      return res.status(400).json({
-        message: "Thiếu giá bán (unit_price)",
         success: false,
       });
     }
@@ -168,8 +147,6 @@ exports.createPart = async (req, res) => {
       part_number,
       part_name,
       description,
-      cost_price,
-      unit_price,
       supplier,
       warranty_month,
     });
@@ -195,15 +172,8 @@ exports.createPart = async (req, res) => {
 exports.updatePart = async (req, res) => {
   try {
     const { partId } = req.params;
-    const {
-      part_number,
-      part_name,
-      description,
-      cost_price,
-      unit_price,
-      supplier,
-      warranty_month,
-    } = req.body;
+    const { part_number, part_name, description, supplier, warranty_month } =
+      req.body;
     const userId = req._id?.toString();
 
     if (!userId) {
@@ -241,8 +211,6 @@ exports.updatePart = async (req, res) => {
     if (part_number !== undefined) part.part_number = part_number;
     if (part_name !== undefined) part.part_name = part_name;
     if (description !== undefined) part.description = description;
-    if (cost_price !== undefined) part.cost_price = cost_price;
-    if (unit_price !== undefined) part.unit_price = unit_price;
     if (supplier !== undefined) part.supplier = supplier;
     if (warranty_month !== undefined) part.warranty_month = warranty_month;
 
