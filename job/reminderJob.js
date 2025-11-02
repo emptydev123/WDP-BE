@@ -31,7 +31,7 @@ async function checkDueReminders() {
 
                 console.log(`✅ Đã gửi reminder ID: ${reminder._id}`);
             } catch (error) {
-                console.error(`❌ Error processing reminder ${reminder._id}:`, error.message);
+                console.error(` Error processing reminder ${reminder._id}:`, error.message);
             }
         }
 

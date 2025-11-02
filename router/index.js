@@ -20,7 +20,7 @@ router.use("/appointment", appointmentRouter);
 router.use("/service-center", serviceCenterRouter);
 router.use("/inventory", inventoryRouter);
 router.use("/parts", partsRouter);
-router.use("/service-centers", serviceCenterRouter);
+// router.use("/service-centers", serviceCenterRouter);
 router.use("/issue-types", issueTypeRouter);
 router.use("/issue-reports", issueReportRouter);
 router.use("/notifications", notificationRouter);

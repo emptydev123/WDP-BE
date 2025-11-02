@@ -81,6 +81,16 @@ const appointmentSchema = new schema(
       required: false,
       default: null,
     },
+    check_in_type: {
+      type: String,
+      enum: ["offline", "online"],
+      default: "offline",
+    },
+    check_in_time: {
+      type: Date,
+      required: false,
+      default: null,
+    }
   },
   { timestamps: true }
 );

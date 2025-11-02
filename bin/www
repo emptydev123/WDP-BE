@@ -10,7 +10,7 @@ var http = require('http');
 const { initializeSocketServer } = require('../socket/socket');  // Import socket.js
 const { setIoInstance } = require('../socket/reminderEvent');  // Import setIoInstance
 const { checkDueReminders } = require('../job/reminderJob');  // Import reminder job
-
+const { resetSlotsForAllCenters } = require('../job/slotJob');
 
 /**
  * Get port from environment and store in Express.
@@ -40,6 +40,7 @@ server.on('listening', () => {
   onListening();
   // Initialize reminder job after server is ready
   checkDueReminders();
+  resetSlotsForAllCenters();
   console.log('Reminder job initialized');
 });
 

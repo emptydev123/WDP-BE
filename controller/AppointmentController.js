@@ -20,7 +20,10 @@ const {
   getCurrentTime,
   isPastDate,
 } = require("../utils/timeUtils");
-
+var Technican = require('../model/technican')
+const { getDayOfWeek } = require('../utils/logicSlots')
+var ServiceCenterHours = require('../model/serviceCenterHours')
+const { checkAndUpdateSlotsForNextWeek } = require('../utils/logicSlots')
 exports.getAppointments = async (req, res) => {
   try {
     const {
@@ -791,6 +794,55 @@ exports.getAppointmentsByTechnician = async (req, res) => {
   }
 };
 
+exports.deleteAppointment = async (req, res) => {
+  try {
+    const { appointmentId } = req.params;
+    const userId = req._id?.toString();
+
+    if (!userId) {
+      return res.status(401).json({
+        message: "Unauthorized",
+        success: false,
+      });
+    }
+
+    if (!appointmentId) {
+      return res.status(400).json({
+        message: "Thiếu appointment ID",
+        success: false,
+      });
+    }
+
+    const appointment = await Appointment.findById(appointmentId);
+    if (!appointment) {
+      return res.status(404).json({
+        message: "Không tìm thấy appointment",
+        success: false,
+      });
+    }
+
+    if (appointment.status !== "pending") {
+      return res.status(400).json({
+        message: "Chỉ có thể xóa appointment có trạng thái pending",
+        success: false,
+      });
+    }
+
+    await Appointment.findByIdAndDelete(appointmentId);
+
+    return res.status(200).json({
+      message: "Xóa appointment thành công",
+      success: true,
+    });
+  } catch (error) {
+    console.error("Delete appointment error:", error);
+    return res.status(500).json({
+      message: "Lỗi xóa appointment",
+      error: error.message,
+      success: false,
+    });
+  }
+};
 exports.createFinalPayment = async (req, res) => {
   try {
     const { appointmentId } = req.params;
@@ -927,56 +979,6 @@ exports.createFinalPayment = async (req, res) => {
     });
   }
 };
-
-exports.deleteAppointment = async (req, res) => {
-  try {
-    const { appointmentId } = req.params;
-    const userId = req._id?.toString();
-
-    if (!userId) {
-      return res.status(401).json({
-        message: "Unauthorized",
-        success: false,
-      });
-    }
-
-    if (!appointmentId) {
-      return res.status(400).json({
-        message: "Thiếu appointment ID",
-        success: false,
-      });
-    }
-
-    const appointment = await Appointment.findById(appointmentId);
-    if (!appointment) {
-      return res.status(404).json({
-        message: "Không tìm thấy appointment",
-        success: false,
-      });
-    }
-
-    if (appointment.status !== "pending") {
-      return res.status(400).json({
-        message: "Chỉ có thể xóa appointment có trạng thái pending",
-        success: false,
-      });
-    }
-
-    await Appointment.findByIdAndDelete(appointmentId);
-
-    return res.status(200).json({
-      message: "Xóa appointment thành công",
-      success: true,
-    });
-  } catch (error) {
-    console.error("Delete appointment error:", error);
-    return res.status(500).json({
-      message: "Lỗi xóa appointment",
-      error: error.message,
-      success: false,
-    });
-  }
-};
 exports.validateAppointmentRules = async ({
   appoinment_date,
   appoinment_time,
@@ -1067,6 +1069,169 @@ exports.validateAppointmentRules = async ({
 
   return null;
 };
+/**
+ * Tự động assign technician cho appointment
+ * Logic: Tìm technician có slot còn lại trong ngày và không bận vào thời gian đó
+ */
+exports.autoAssignTechnician = async ({
+  center_id,
+  appoinment_date,
+  appoinment_time,
+  serviceType,
+  excludeTechnicianId = null, // Nếu đã có technician được chỉ định thì không assign lại
+}) => {
+  try {
+    // Lấy tất cả technicians của center này (status = 'on')
+    const technicians = await Technican.find({
+      center_id,
+      status: "on",
+    }).populate("user_id");
+
+    if (!technicians || technicians.length === 0) {
+      return null; // Không có technician nào
+    }
+
+    // Chuyển đổi appointment_date sang Date object để so sánh
+    const appointmentDate = new Date(appoinment_date);
+    appointmentDate.setHours(0, 0, 0, 0);
+    const appointmentDateEnd = new Date(appoinment_date);
+    appointmentDateEnd.setHours(23, 59, 59, 999);
+
+    // Lọc technicians có thể làm việc
+    const availableTechnicians = [];
+
+    for (const tech of technicians) {
+      const techUserId = tech.user_id._id.toString();
+
+      // Bỏ qua technician nếu bị exclude
+      if (excludeTechnicianId && techUserId === excludeTechnicianId.toString()) {
+        continue;
+      }
+
+      // 1. Kiểm tra technician đã đủ 4 slot trong ngày chưa
+      // Check cả assigned và technician_id để đảm bảo không bỏ sót
+      const appointmentsInDay = await Appointment.countDocuments({
+        $or: [
+          { assigned: techUserId },
+          { technician_id: techUserId }
+        ],
+        appoinment_date: {
+          $gte: appointmentDate,
+          $lte: appointmentDateEnd,
+        },
+        status: {
+          $in: ["pending", "accepted", "assigned", "in_progress", "deposited"],
+        },
+      });
+
+      // Mỗi technician chỉ làm tối đa 4 slot/ngày
+      if (appointmentsInDay >= 4) {
+        continue; // Technician này đã full slot
+      }
+
+      // 2. Kiểm tra technician có bận vào thời gian này không
+      const conflictingAppointments = await Appointment.find({
+        $or: [
+          { assigned: techUserId },
+          { technician_id: techUserId }
+        ],
+        appoinment_date: {
+          $gte: appointmentDate,
+          $lte: appointmentDateEnd,
+        },
+        status: {
+          $in: ["pending", "accepted", "assigned", "in_progress", "deposited"],
+        },
+      })
+        .populate("service_type_id")
+        .lean();
+
+      // Kiểm tra overlap thời gian
+      let hasConflict = false;
+      const BUFFER_MS = 5 * 60 * 1000; // 5 phút buffer
+
+      const newStart = buildLocalDateTime(appoinment_date, appoinment_time);
+      const newEnd = new Date(
+        newStart.getTime() +
+        parseDurationToMs(serviceType.estimated_duration) +
+        BUFFER_MS
+      );
+
+      for (const existingAppt of conflictingAppointments) {
+        if (!existingAppt.appoinment_time || !existingAppt.service_type_id) {
+          continue;
+        }
+
+        const existingDateStr = existingAppt.appoinment_date
+          .toISOString()
+          .split("T")[0];
+        const existingStart = buildLocalDateTime(
+          existingDateStr,
+          existingAppt.appoinment_time
+        );
+
+        const existingDurationStr =
+          existingAppt.service_type_id?.estimated_duration ||
+          existingAppt.estimated_duration ||
+          "0";
+
+        const existingEnd = new Date(
+          existingStart.getTime() +
+          parseDurationToMs(existingDurationStr) +
+          BUFFER_MS
+        );
+
+        // Check overlap
+        const overlap =
+          (newStart >= existingStart && newStart < existingEnd) ||
+          (newEnd > existingStart && newEnd <= existingEnd) ||
+          (newStart <= existingStart && newEnd >= existingEnd);
+
+        if (overlap) {
+          hasConflict = true;
+          break;
+        }
+      }
+
+      if (!hasConflict) {
+        // Technician này available
+        availableTechnicians.push({
+          technician: tech,
+          currentAppointments: appointmentsInDay,
+        });
+      }
+    }
+
+    // Nếu không có technician nào available
+    if (availableTechnicians.length === 0) {
+      return null;
+    }
+
+    // Nếu chỉ có 1 technician available, chọn người đó
+    if (availableTechnicians.length === 1) {
+      return availableTechnicians[0].technician.user_id._id.toString();
+    }
+
+    // Nếu có nhiều technicians, ưu tiên người có ít appointments nhất (công bằng)
+    // Nếu bằng nhau thì random
+    availableTechnicians.sort(
+      (a, b) => a.currentAppointments - b.currentAppointments
+    );
+
+    // Lấy các technicians có số appointments ít nhất
+    const minAppointments = availableTechnicians[0].currentAppointments;
+    const topTechnicians = availableTechnicians.filter(
+      (t) => t.currentAppointments === minAppointments
+    );
+
+    // Random trong số những người có appointments ít nhất
+    const randomIndex = Math.floor(Math.random() * topTechnicians.length);
+    return topTechnicians[randomIndex].technician.user_id._id.toString();
+  } catch (error) {
+    console.error("Auto assign technician error:", error);
+    return null;
+  }
+};
 
 exports.createDepositPayment = async (userId, appointmentId) => {
   const depositAmount = 2000;
@@ -1108,35 +1273,55 @@ exports.createDepositPayment = async (userId, appointmentId) => {
   }
   return paymentResult;
 };
+
 exports.createAppointment = async (req, res) => {
   try {
     const { appoinment_date, appoinment_time, notes, user_id, vehicle_id, center_id, service_type_id, technician_id } = req.body;
     const userId = req._id?.toString();
+
     if (!userId)
       return res.status(401).json({ message: "Unauthorized", success: false });
 
+    //  Kiểm tra thông tin cơ bản
     const [user, vehicle, serviceCenter, serviceType] = await Promise.all([
       User.findById(user_id),
       Vehicle.findById(vehicle_id),
       ServiceCenter.findById(center_id),
       ServiceType.findById(service_type_id),
     ]);
-    if (!user || !vehicle || !serviceCenter || !serviceType)
-      return res
-        .status(404)
-        .json({ message: "Thông tin không hợp lệ", success: false });
 
+    if (!user || !vehicle || !serviceCenter || !serviceType)
+      return res.status(404).json({ message: "Thông tin không hợp lệ", success: false });
+
+    //  Reset slot nếu người dùng đặt cho tuần sau mà cron chưa reset
+    await checkAndUpdateSlotsForNextWeek(appoinment_date, center_id);
+
+    //  Kiểm tra số lượng slot còn lại trong ngày cho center
+    const serviceCenterHours = await ServiceCenterHours.findOne({
+      center_id,
+      day_of_week: getDayOfWeek(appoinment_date),
+    });
+
+    if (!serviceCenterHours) {
+      return res.status(400).json({
+        message: "Không tìm thấy thông tin giờ làm việc cho trung tâm này",
+        success: false,
+      });
+    }
+
+    //  Kiểm tra còn slot không
+    if (serviceCenterHours.remainingSlots <= 0) {
+      return res.status(400).json({
+        message: "Không còn slot trống cho ngày này. Vui lòng chọn ngày khác.",
+      });
+    }
+
+
+    //  Kiểm tra quy tắc đặt lịch khác (nếu có)
     const existingAppointments = await Appointment.find({
       user_id,
       status: {
-        $in: [
-          "pending",
-          "confirmed",
-          "in_progress",
-          "deposited",
-          "completed",
-          "paid",
-        ],
+        $in: ["pending", "confirmed", "in_progress", "deposited", "completed", "paid"],
       },
     }).populate("service_type_id center_id vehicle_id");
 
@@ -1149,11 +1334,142 @@ exports.createAppointment = async (req, res) => {
       serviceType,
       existingAppointments,
     });
-    if (ruleError) return res.status(400).json({ message: ruleError, success: false });
 
-    // THÊM MỚI: nếu không chọn technician -> để null
-    const selectedTechnician = technician_id && technician_id.trim() !== "" ? technician_id : null;
+    if (ruleError)
+      return res.status(400).json({ message: ruleError, success: false });
 
+    // Đánh dấu có lịch đặt và trừ slot 1 lần duy nhất
+    serviceCenterHours.isBooked = true;
+    serviceCenterHours.remainingSlots -= 1;
+    await serviceCenterHours.save();
+
+    // Xử lý technician assignment
+    let selectedTechnician = null;
+
+    // Nếu khách chọn technician cụ thể
+    if (technician_id && technician_id.trim() !== "") {
+      selectedTechnician = technician_id;
+
+      // Kiểm tra technician có tồn tại và thuộc center này không
+      const techRecord = await Technican.findOne({
+        user_id: technician_id,
+        center_id: center_id,
+        status: "on",
+      });
+
+      if (!techRecord) {
+        return res.status(400).json({
+          message: "Technician không tồn tại hoặc không thuộc trung tâm này",
+          success: false,
+        });
+      }
+
+      // Kiểm tra technician có còn slot và không bận không
+      const appointmentDate = new Date(appoinment_date);
+      appointmentDate.setHours(0, 0, 0, 0);
+      const appointmentDateEnd = new Date(appoinment_date);
+      appointmentDateEnd.setHours(23, 59, 59, 999);
+
+      const appointmentsInDay = await Appointment.countDocuments({
+        $or: [
+          { assigned: technician_id },
+          { technician_id: technician_id }
+        ],
+        appoinment_date: {
+          $gte: appointmentDate,
+          $lte: appointmentDateEnd,
+        },
+        status: {
+          $in: ["pending", "accepted", "assigned", "in_progress", "deposited"],
+        },
+      });
+
+      if (appointmentsInDay >= 4) {
+        return res.status(400).json({
+          message: "Technician đã đủ 4 slot trong ngày. Vui lòng chọn technician khác hoặc để hệ thống tự động phân công.",
+          success: false,
+        });
+      }
+
+      // Kiểm tra conflict thời gian
+      const conflictingAppointments = await Appointment.find({
+        $or: [
+          { assigned: technician_id },
+          { technician_id: technician_id }
+        ],
+        appoinment_date: {
+          $gte: appointmentDate,
+          $lte: appointmentDateEnd,
+        },
+        status: {
+          $in: ["pending", "accepted", "assigned", "in_progress", "deposited"],
+        },
+      })
+        .populate("service_type_id")
+        .lean();
+
+      const BUFFER_MS = 5 * 60 * 1000;
+      const newStart = buildLocalDateTime(appoinment_date, appoinment_time);
+      const newEnd = new Date(
+        newStart.getTime() +
+        parseDurationToMs(serviceType.estimated_duration) +
+        BUFFER_MS
+      );
+
+      for (const existingAppt of conflictingAppointments) {
+        if (!existingAppt.appoinment_time || !existingAppt.service_type_id) {
+          continue;
+        }
+
+        const existingDateStr = existingAppt.appoinment_date
+          .toISOString()
+          .split("T")[0];
+        const existingStart = buildLocalDateTime(
+          existingDateStr,
+          existingAppt.appoinment_time
+        );
+
+        const existingDurationStr =
+          existingAppt.service_type_id?.estimated_duration ||
+          existingAppt.estimated_duration ||
+          "0";
+
+        const existingEnd = new Date(
+          existingStart.getTime() +
+          parseDurationToMs(existingDurationStr) +
+          BUFFER_MS
+        );
+
+        const overlap =
+          (newStart >= existingStart && newStart < existingEnd) ||
+          (newEnd > existingStart && newEnd <= existingEnd) ||
+          (newStart <= existingStart && newEnd >= existingEnd);
+
+        if (overlap) {
+          return res.status(400).json({
+            message: "Technician đã có lịch trùng vào thời gian này. Vui lòng chọn technician khác hoặc để hệ thống tự động phân công.",
+            success: false,
+          });
+        }
+      }
+    } else {
+      // Tự động assign technician nếu khách không chọn
+      selectedTechnician = await exports.autoAssignTechnician({
+        center_id,
+        appoinment_date,
+        appoinment_time,
+        serviceType,
+      });
+
+      if (!selectedTechnician) {
+        return res.status(400).json({
+          message: "Không tìm thấy technician khả dụng vào thời gian này. Tất cả technicians đã đủ slot hoặc đang bận.",
+          success: false,
+        });
+      }
+    }
+
+    //  Tạo appointment mới
     const appointment = new Appointment({
       appoinment_date: new Date(appoinment_date),
       appoinment_time,
@@ -1165,23 +1481,37 @@ exports.createAppointment = async (req, res) => {
       service_type_id,
       status: "pending",
       technician_id: selectedTechnician,
+      assigned: selectedTechnician, // Cũng set vào assigned field
     });
+
     await appointment.save();
 
-    const paymentResult = await exports.createDepositPayment(
-      userId,
-      appointment._id
-    );
+    //  Xử lý thanh toán tiền cọc nếu có
+    const paymentResult = await exports.createDepositPayment(userId, appointment._id);
     if (paymentResult?.success) {
       appointment.payment_id = paymentResult.data.payment_id;
       await appointment.save();
     }
 
+    // Populate thông tin technician đã được assign
+    const populatedAppointment = await Appointment.findById(appointment._id)
+      .populate("user_id", "username fullName email phone")
+      .populate("center_id", "center_name address phone")
+      .populate("vehicle_id", "license_plate vin")
+      .populate("assigned", "username fullName email phone role")
+      .populate("technician_id", "username fullName email phone role")
+      .populate("service_type_id", "service_name description base_price estimated_duration")
+      .populate("payment_id", "order_code amount status checkout_url qr_code")
+      .lean();
+
     return res.status(201).json({
-      message: "Tạo appointment thành công",
+      message: selectedTechnician && !technician_id
+        ? "Tạo appointment thành công. Hệ thống đã tự động phân công technician."
+        : "Tạo appointment thành công",
       success: true,
-      data: appointment,
+      data: populatedAppointment,
     });
+
   } catch (error) {
     console.error("Create appointment error:", error);
     return res.status(500).json({
@@ -1191,6 +1521,8 @@ exports.createAppointment = async (req, res) => {
     });
   }
 };
+
+
 
 
 

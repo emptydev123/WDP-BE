@@ -1,4 +1,5 @@
 const serviceCenter = require("../controller/ServiceCenterController");
+const serviceCenterHours = require("../controller/ServiceCenterHoursController");
 var express = require("express");
 var router = express.Router();
 const auth = require("../middlewares/auth");
@@ -28,6 +29,7 @@ const auth = require("../middlewares/auth");
  *               - center_name
  *               - address
  *               - phone
+ *               - user_id
  *               - email
  *             properties:
  *               center_name:
@@ -48,6 +50,8 @@ const auth = require("../middlewares/auth");
  *     responses:
  *       201:
  *         description: Tạo Service Center thành công
+ *       400:
+ *         description: Dữ liệu không hợp lệ
  *       401:
  *         description: Không có quyền truy cập
  *       500:
@@ -60,58 +64,7 @@ router.post(
   serviceCenter.createServiceCenter
 );
 
-/**
- * @swagger
- * /api/service-center/schedule/create/{id}:
- *   post:
- *     summary: Tạo lịch làm việc cho trung tâm
- *     tags: [Service Center]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - name: id
- *         in: path
- *         required: true
- *         schema:
- *           type: string
- *         description: ID của trung tâm cần tạo lịch làm việc
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - day_of_week
- *               - open_time
- *               - close_time
- *             properties:
- *               day_of_week:
- *                 type: string
- *                 example: "Monday"
- *               open_time:
- *                 type: string
- *                 example: "08:00"
- *               close_time:
- *                 type: string
- *                 example: "17:00"
- *               is_close:
- *                 type: boolean
- *                 example: false
- *     responses:
- *       202:
- *         description: Tạo lịch làm việc trung tâm thành công
- *       404:
- *         description: Không tìm thấy trung tâm
- *       500:
- *         description: Lỗi server
- */
-router.post(
-  "/schedule/create/:id",
-  auth.authMiddleWare,
-  auth.requireRole("admin", "technician", "staff"),
-  serviceCenter.createServiceCenterSchedule
-);
+
 
 /**
  * @swagger
@@ -122,7 +75,7 @@ router.post(
  *     security:
  *       - bearerAuth: []
  *     responses:
- *       202:
+ *       200:
  *         description: Lấy danh sách trung tâm và giờ làm việc thành công
  *         content:
  *           application/json:
@@ -134,7 +87,7 @@ router.post(
  *                   example: true
  *                 message:
  *                   type: string
- *                   example: "Danh sách trung tâm và giờ làm việc"
+ *                   example: "Lấy danh sách trung tâm và giờ làm việc thành công"
  *                 data:
  *                   type: array
  *                   items:
@@ -155,11 +108,19 @@ router.post(
  *                       email:
  *                         type: string
  *                         example: "evcenter@gmail.com"
+ *                       is_active:
+ *                         type: boolean
+ *                         example: true
+ *                       slots:
+ *                         type: number
+ *                         example: 16
  *                       working_hours:
  *                         type: array
  *                         items:
  *                           type: object
  *                           properties:
+ *                             _id:
+ *                               type: string
  *                             day_of_week:
  *                               type: string
  *                               example: "Monday"
@@ -172,6 +133,20 @@ router.post(
  *                             is_close:
  *                               type: boolean
  *                               example: false
+ *                             availableSlots:
+ *                               type: number
+ *                               example: 16
+ *                             totalSlots:
+ *                               type: number
+ *                               example: 16
+ *                             remainingSlots:
+ *                               type: number
+ *                               example: 12
+ *                             isBooked:
+ *                               type: boolean
+ *                               example: true
+ *       401:
+ *         description: Unauthorized
  *       500:
  *         description: Lỗi server khi lấy danh sách trung tâm
  */
@@ -179,7 +154,7 @@ router.get(
   "/get",
   auth.authMiddleWare,
   auth.requireRole("customer", "staff", "technician", "admin"),
-  serviceCenter.getAllServiceCenters
+  serviceCenterHours.getAllServiceCentersWithHours
 );
 
 /**
@@ -311,5 +286,99 @@ router.delete(
   auth.authMiddleWare,
   auth.requireRole("customer", "admin", "staff"),
   serviceCenter.deleteServiceCenter
+);
+/**
+ * @swagger
+ * /api/service-center/technican/add:
+ *   post:
+ *     summary: Thêm nhân viên vào trung tâm
+ *     tags: [Service Center]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - user_id
+ *               - center_id
+ *             properties:
+ *               user_id:
+ *                 type: string
+ *                 description: ID của người dùng (nhân viên)
+ *                 example: "60d5f84e5b7c6d001f8184d2"
+ *               center_id:
+ *                 type: string
+ *                 description: ID của trung tâm
+ *                 example: "60d5f84e5b7c6d001f8184d3"
+ *               maxSlotsPerDay:
+ *                 type: number
+ *                 description: Số slot tối đa mỗi nhân viên có thể làm trong 1 ngày (mặc định là 4)
+ *                 example: 4
+ *               status:
+ *                 type: string
+ *                 enum: ["on", "off"]
+ *                 description: Trạng thái làm việc của nhân viên
+ *                 example: "on"
+ *     responses:
+ *       201:
+ *         description: Nhân viên đã được thêm vào trung tâm
+ *       400:
+ *         description: Dữ liệu không hợp lệ
+ *       404:
+ *         description: Không tìm thấy trung tâm hoặc nhân viên
+ *       500:
+ *         description: Lỗi server
+ */
+router.post(
+  '/technican/add',
+  auth.authMiddleWare,
+  auth.requireRole('admin', 'technician', 'staff', "customer"),
+  serviceCenter.addTechnicanToServiceCenter
+);
+
+/**
+ * @swagger
+ * /api/service-center/technican/remove:
+ *   post:
+ *     summary: Xóa nhân viên khỏi trung tâm
+ *     tags: [Service Center]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - user_id
+ *               - center_id
+ *             properties:
+ *               user_id:
+ *                 type: string
+ *                 description: ID của người dùng (nhân viên)
+ *                 example: "60d5f84e5b7c6d001f8184d2"
+ *               center_id:
+ *                 type: string
+ *                 description: ID của trung tâm
+ *                 example: "60d5f84e5b7c6d001f8184d3"
+ *     responses:
+ *       200:
+ *         description: Nhân viên đã được xóa khỏi trung tâm
+ *       400:
+ *         description: Dữ liệu không hợp lệ
+ *       404:
+ *         description: Không tìm thấy trung tâm hoặc nhân viên
+ *       500:
+ *         description: Lỗi server
+ */
+router.post(
+  '/technican/remove',
+  auth.authMiddleWare,
+  auth.requireRole('admin', 'technician', 'staff', 'customer'),
+  serviceCenter.removeTechnicanFromCenter
 );
 module.exports = router;

@@ -148,9 +148,8 @@ exports.getAllProfileUsers = async (req, res) => {
     } else {
       query.role = role || "customer";
     }
-    const cacheKey = `users:all:${
-      id ? `id:${id}` : `role:${role || "customer"}`
-    }:${validatedPage}:${validatedLimit}`;
+    const cacheKey = `users:all:${id ? `id:${id}` : `role:${role || "customer"}`
+      }:${validatedPage}:${validatedLimit}`;
 
     const cached = await cacheGet(cacheKey);
     if (cached) {
@@ -195,13 +194,14 @@ exports.loginGoogle = async (req, res) => {
     const decodedToken = await admin.auth().verifyIdToken(idToken);
     const email = decodedToken.email;
     const fullName = decodedToken.name;
-
+    const username = email
     let user = await User.findOne({ email });
     let isNew = false;
     if (!user) {
       user = await User.create({
         email,
         fullName,
+        username,
         role: "customer",
         provider: "google",
       });
