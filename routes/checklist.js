@@ -1,22 +1,22 @@
-// routes/issueReport.js
+// routes/checklist.js
 const express = require("express");
 const router = express.Router();
-const IssueReportController = require("../controller/IssueReportController");
+const ChecklistController = require("../controller/ChecklistController");
 const { authMiddleWare } = require("../middlewares/auth");
 
 /**
  * @swagger
  * tags:
- *   name: IssueReports
- *   description: API quản lý báo cáo vấn đề (Issue Reports)
+ *   name: Checklist
+ *   description: API quản lý checklist
  */
 
 /**
  * @swagger
- * /api/issue-reports:
+ * /api/checklist:
  *   get:
- *     summary: Lấy danh sách issue reports
- *     tags: [IssueReports]
+ *     summary: Lấy danh sách checklist
+ *     tags: [Checklist]
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -41,41 +41,14 @@ const { authMiddleWare } = require("../middlewares/auth");
  *       401:
  *         description: Unauthorized
  */
-router.get("/", authMiddleWare, IssueReportController.getAllIssueReports);
+router.get("/", authMiddleWare, ChecklistController.getAllChecklists);
 
 /**
  * @swagger
- * /api/issue-reports/appointment/{appointment_id}:
- *   get:
- *     summary: Lấy tất cả issue reports của appointment
- *     tags: [IssueReports]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: appointment_id
- *         required: true
- *         schema:
- *           type: string
- *         description: Appointment ID
- *     responses:
- *       200:
- *         description: Success
- *       401:
- *         description: Unauthorized
- */
-router.get(
-  "/appointment/:appointment_id",
-  authMiddleWare,
-  IssueReportController.getIssueReportsByAppointment
-);
-
-/**
- * @swagger
- * /api/issue-reports:
+ * /api/checklist:
  *   post:
- *     summary: Tạo issue report mới (Technician)
- *     tags: [IssueReports]
+ *     summary: Tạo checklist mới (Technician)
+ *     tags: [Checklist]
  *     security:
  *       - bearerAuth: []
  *     requestBody:
@@ -102,14 +75,13 @@ router.get(
  *               solution_applied:
  *                 type: string
  *                 description: Giải pháp đã áp dụng
- *               parts_used:
+ *               parts:
  *                 type: array
  *                 items:
  *                   type: object
  *                   required:
  *                     - part_id
  *                     - quantity
- *                     - unit_cost
  *                   properties:
  *                     part_id:
  *                       type: string
@@ -118,97 +90,79 @@ router.get(
  *                       type: number
  *                       description: Số lượng
  *                       minimum: 1
- *                     unit_cost:
- *                       type: number
- *                       description: Giá tại thời điểm sử dụng
- *                 description: Danh sách parts đã sử dụng (optional)
+ *                 description: Danh sách parts cần sử dụng (optional)
  *     responses:
  *       201:
- *         description: Created (Issue report created and appointment status updated to completed)
+ *         description: Created (Checklist created with pending status)
  *       400:
  *         description: Bad request
  *       403:
  *         description: Forbidden (not assigned to appointment)
  */
-router.post("/", authMiddleWare, IssueReportController.createIssueReport);
+router.post("/", authMiddleWare, ChecklistController.createChecklist);
 
 /**
  * @swagger
- * /api/issue-reports/{reportId}:
+ * /api/checklist/{checklistId}/accept:
  *   put:
- *     summary: Cập nhật issue report
- *     tags: [IssueReports]
+ *     summary: Staff chấp nhận checklist và cập nhật inventory
+ *     tags: [Checklist]
  *     security:
  *       - bearerAuth: []
  *     parameters:
  *       - in: path
- *         name: reportId
+ *         name: checklistId
  *         required: true
  *         schema:
  *           type: string
- *     requestBody:
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               issue_type_id:
- *                 type: string
- *               issue_description:
- *                 type: string
- *               solution_applied:
- *                 type: string
- *               parts_used:
- *                 type: array
- *                 items:
- *                   type: object
- *                   properties:
- *                     part_id:
- *                       type: string
- *                     quantity:
- *                       type: number
- *                     unit_cost:
- *                       type: number
  *     responses:
  *       200:
- *         description: Updated
+ *         description: Checklist accepted, inventory updated
+ *       400:
+ *         description: Bad request or insufficient inventory
+ *       401:
+ *         description: Unauthorized
  *       403:
- *         description: Forbidden
+ *         description: Staff role required
  *       404:
- *         description: Report not found
+ *         description: Checklist not found
  */
 router.put(
-  "/:reportId",
+  "/:checklistId/accept",
   authMiddleWare,
-  IssueReportController.updateIssueReport
+  ChecklistController.acceptChecklist
 );
 
 /**
  * @swagger
- * /api/issue-reports/{reportId}:
- *   delete:
- *     summary: Xóa issue report
- *     tags: [IssueReports]
+ * /api/checklist/{checklistId}/complete:
+ *   put:
+ *     summary: Technician hoàn thành checklist
+ *     tags: [Checklist]
  *     security:
  *       - bearerAuth: []
  *     parameters:
  *       - in: path
- *         name: reportId
+ *         name: checklistId
  *         required: true
  *         schema:
  *           type: string
  *     responses:
  *       200:
- *         description: Deleted
+ *         description: Checklist completed
+ *       400:
+ *         description: Bad request
+ *       401:
+ *         description: Unauthorized
  *       403:
  *         description: Forbidden
  *       404:
- *         description: Report not found
+ *         description: Checklist not found
  */
-router.delete(
-  "/:reportId",
+router.put(
+  "/:checklistId/complete",
   authMiddleWare,
-  IssueReportController.deleteIssueReport
+  ChecklistController.completeChecklist
 );
 
 module.exports = router;

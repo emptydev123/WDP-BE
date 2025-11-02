@@ -296,48 +296,171 @@ router.get(
 
 /**
  * @swagger
- * /api/payment/success:
- *   get:
- *     summary: Xử lý khi thanh toán thành công (Return URL)
+ * /api/payment/webhook/payos:
+ *   post:
+ *     summary: PayOS webhook endpoint
  *     tags: [Payments]
- *     parameters:
- *       - in: query
- *         name: order_code
- *         required: true
- *         schema:
- *           type: string
- *         description: Mã đơn hàng từ PayOS
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
  *     responses:
- *       302:
- *         description: Redirect về frontend với thông tin thành công
+ *       200:
+ *         description: Webhook processed successfully
  *       400:
- *         description: Thiếu order_code
- *       500:
- *         description: Lỗi server
+ *         description: Invalid webhook data
  */
-router.get("/success", payment.paymentSuccess);
+router.post("/webhook/payos", payment.handlePayOSWebhook);
 
 /**
  * @swagger
- * /api/payment/cancel:
+ * /api/payment/retry/{id}:
  *   get:
- *     summary: Xử lý khi thanh toán bị hủy (Cancel URL)
+ *     summary: Retry failed payment by payment ID
  *     tags: [Payments]
+ *     security:
+ *       - bearerAuth: []
  *     parameters:
- *       - in: query
- *         name: order_code
+ *       - in: path
+ *         name: id
  *         required: true
  *         schema:
  *           type: string
- *         description: Mã đơn hàng từ PayOS
+ *         description: Payment ID to retry
  *     responses:
- *       302:
- *         description: Redirect về frontend với thông tin hủy
+ *       201:
+ *         description: Retry payment created successfully
  *       400:
- *         description: Thiếu order_code
- *       500:
- *         description: Lỗi server
+ *         description: Bad request
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: Payment not found
  */
-router.get("/cancel", payment.paymentCancel);
+router.get(
+  "/retry/:id",
+  auth.authMiddleWare,
+  auth.requireRole("customer", "staff", "admin"),
+  payment.retryPayment
+);
+
+/**
+ * @swagger
+ * /api/payment/cancel/{orderCode}:
+ *   post:
+ *     summary: Cancel payment
+ *     tags: [Payments]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: orderCode
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Order code to cancel
+ *     responses:
+ *       200:
+ *         description: Payment cancelled successfully
+ *       400:
+ *         description: Cannot cancel payment
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: Payment not found
+ */
+router.post(
+  "/cancel/:orderCode",
+  auth.authMiddleWare,
+  auth.requireRole("customer", "staff", "admin"),
+  payment.cancelPayment
+);
+
+/**
+ * @swagger
+ * /api/payment/timeout-check:
+ *   get:
+ *     summary: Check for timeout payments
+ *     tags: [Payments]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Timeout check completed
+ *       401:
+ *         description: Unauthorized
+ */
+/**
+ * @swagger
+ * /api/payment/test-retry/{orderCode}:
+ *   get:
+ *     summary: Test retry functionality for a payment
+ *     tags: [Payments]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: orderCode
+ *         required: true
+ *         schema:
+ *           type: number
+ *         description: Order code to test retry functionality
+ *     responses:
+ *       200:
+ *         description: Retry functionality test completed
+ *       400:
+ *         description: Bad request
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: Payment not found
+ */
+/**
+ * @swagger
+ * /api/payment/history/appointment/{appointmentId}:
+ *   get:
+ *     summary: Get payment history for an appointment
+ *     tags: [Payments]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: appointmentId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Appointment ID to get payment history
+ *     responses:
+ *       200:
+ *         description: Payment history retrieved successfully
+ *       400:
+ *         description: Bad request
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: Appointment not found
+ */
+router.get(
+  "/history/appointment/:appointmentId",
+  auth.authMiddleWare,
+  auth.requireRole("customer", "staff", "admin"),
+  payment.getPaymentHistoryByAppointment
+);
+
+router.get(
+  "/test-retry/:orderCode",
+  auth.authMiddleWare,
+  auth.requireRole("customer", "staff", "admin"),
+  payment.testRetryFunctionality
+);
+
+router.get(
+  "/timeout-check",
+  auth.authMiddleWare,
+  auth.requireRole("customer", "staff", "admin", "technician"),
+  payment.timeoutCheck
+);
 
 module.exports = router;

@@ -12,6 +12,12 @@ const partsRouter = require("../routes/parts");
 const issueTypeRouter = require("../routes/issueType");
 const issueReportRouter = require("../routes/issueReport");
 const notificationRouter = require('../routes/notification');
+const checklistRouter = require("../routes/checklist");
+const PaymentController = require("../controller/PaymentController");
+
+// Webhook endpoint cho PayOS (không cần auth)
+router.post("/webhook/payos", PaymentController.handlePayOSWebhook);
+
 router.use("/users", userRouter);
 router.use("/service", serviceRouter);
 router.use("/vehicle", vehicleRouter);
@@ -24,5 +30,7 @@ router.use("/parts", partsRouter);
 router.use("/issue-types", issueTypeRouter);
 router.use("/issue-reports", issueReportRouter);
 router.use("/notifications", notificationRouter);
+router.use("/checklist", checklistRouter);
+
 
 module.exports = router;

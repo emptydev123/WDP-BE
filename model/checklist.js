@@ -1,7 +1,7 @@
 const mongoose = require("mongoose");
 const schema = mongoose.Schema;
 
-const issueReportSchema = new schema(
+const checklistSchema = new schema(
   {
     issue_type_id: {
       type: mongoose.Types.ObjectId,
@@ -21,7 +21,7 @@ const issueReportSchema = new schema(
       type: String,
       required: true,
     },
-    parts_used: [
+    parts: [
       {
         part_id: {
           type: mongoose.Types.ObjectId,
@@ -33,31 +33,16 @@ const issueReportSchema = new schema(
           required: true,
           min: 1,
         },
-        unit_cost: {
-          type: Number,
-          required: true,
-        },
       },
     ],
-    total_parts_cost: {
-      type: Number,
-      default: 0,
+    status: {
+      type: String,
+      enum: ["pending", "accepted", "completed"],
+      default: "pending",
     },
   },
   { timestamps: true }
 );
 
-issueReportSchema.pre("save", function (next) {
-  if (this.parts_used && this.parts_used.length > 0) {
-    this.total_parts_cost = this.parts_used.reduce(
-      (total, part) => total + part.quantity * part.unit_cost,
-      0
-    );
-  } else {
-    this.total_parts_cost = 0;
-  }
-  next();
-});
-
-const IssueReport = mongoose.model("IssueReport", issueReportSchema);
-module.exports = IssueReport;
+const Checklist = mongoose.model("Checklist", checklistSchema);
+module.exports = Checklist;

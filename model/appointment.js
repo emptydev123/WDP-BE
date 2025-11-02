@@ -50,12 +50,12 @@ const appointmentSchema = new schema(
       ref: "ServiceCenter",
       required: true,
     },
-    assigned_by: {
+    staff_id: {
       type: mongoose.Types.ObjectId,
       ref: "User",
       required: false,
     },
-    assigned: {
+    technician_id: {
       type: mongoose.Types.ObjectId,
       ref: "User",
       required: false,

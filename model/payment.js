@@ -1,12 +1,11 @@
 const mongoose = require("mongoose");
-const schema = mongoose.Schema;
 
-const paymentSchema = new schema(
+const PaymentSchema = new mongoose.Schema(
   {
-    order_code: {
+    orderCode: {
       type: Number,
-      required: true,
       unique: true,
+      required: true,
     },
     amount: {
       type: Number,
@@ -18,26 +17,35 @@ const paymentSchema = new schema(
     },
     status: {
       type: String,
-      enum: ["pending", "paid", "cancelled"],
-      default: "pending",
+      enum: ["PENDING", "PAID", "FAILED", "CANCELLED", "EXPIRED", "TIMEOUT"],
+      default: "PENDING",
     },
-
     user_id: {
       type: mongoose.Types.ObjectId,
       ref: "User",
       required: true,
     },
-    checkout_url: {
-      type: String,
-      required: false,
-    },
-    qr_code: {
-      type: String,
-      required: false,
-    },
+    createdAt: { type: Date, default: Date.now },
+    updatedAt: { type: Date, default: Date.now },
+    paidAt: Date,
+    cancelledAt: Date,
+    expiredAt: Date,
+    timeoutAt: {
+      type: Date,
+      default: () => new Date(Date.now() + 15 * 60 * 1000),
+    }, // 15 phút
+    retryOf: Number, // orderCode cũ nếu là đơn retry
+    replacedBy: Number, // orderCode mới nếu bị thay thế
+    customer: { type: Object, default: undefined },
+    checkoutUrl: String,
+    qrCode: String,
+    paymentLinkId: String,
+    lastWebhook: { type: mongoose.Schema.Types.Mixed },
   },
-  { timestamps: true }
+  {
+    timestamps: true,
+    versionKey: false,
+  }
 );
 
-const Payment = mongoose.model("Payment", paymentSchema);
-module.exports = Payment;
+module.exports = mongoose.model("Payment", PaymentSchema);
