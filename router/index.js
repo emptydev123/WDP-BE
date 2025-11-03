@@ -10,6 +10,7 @@ const serviceCenterRouter = require("../routes/servicecenter");
 const inventoryRouter = require("../routes/inventory");
 const partsRouter = require("../routes/parts");
 const issueTypeRouter = require("../routes/issueType");
+const notificationRouter = require('../routes/notification');
 const checklistRouter = require("../routes/checklist");
 const checkinRouter = require("../routes/checkin");
 const dashboardRouter = require("../routes/dashboard");
@@ -26,10 +27,12 @@ router.use("/appointment", appointmentRouter);
 router.use("/service-center", serviceCenterRouter);
 router.use("/inventory", inventoryRouter);
 router.use("/parts", partsRouter);
-router.use("/service-centers", serviceCenterRouter);
+// router.use("/service-centers", serviceCenterRouter);
 router.use("/issue-types", issueTypeRouter);
+router.use("/notifications", notificationRouter);
 router.use("/checklist", checklistRouter);
 router.use("/checkin", checkinRouter);
 router.use("/dashboard", dashboardRouter);
+
 
 module.exports = router;

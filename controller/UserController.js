@@ -84,18 +84,25 @@ exports.login = async (req, res) => {
     if (!checkPassword) {
       return res
         .status(400)
-        .json({ message: "Password Incorect", error: false, success: false });
+        .json({ message: "Password Incorrect", error: false, success: false });
     }
 
     const accessToken = jwt.sign(
-      { userId: user._id, username: user.username },
+      { userId: user._id, username: user.username, role: user.role },
       secretKey,
       { expiresIn: "1h" }
     );
     const refreshToken = jwt.sign({ userId: user._id }, refreshKey, {
       expiresIn: "1d",
     });
-    return res.status(201).json({ status: true, accessToken, refreshToken });
+
+    // Trả về thêm 'role' trong response
+    return res.status(201).json({
+      status: true,
+      accessToken,
+      refreshToken,
+      role: user.role, // Trả về 'role'
+    });
   } catch (error) {
     return res.status(401).json({
       message: error.message || error,
@@ -104,6 +111,7 @@ exports.login = async (req, res) => {
     });
   }
 };
+
 
 exports.getProfileUser = async (req, res) => {
   const userId = req._id?.toString();
@@ -140,9 +148,8 @@ exports.getAllProfileUsers = async (req, res) => {
     } else {
       query.role = role || "customer";
     }
-    const cacheKey = `users:all:${
-      id ? `id:${id}` : `role:${role || "customer"}`
-    }:${validatedPage}:${validatedLimit}`;
+    const cacheKey = `users:all:${id ? `id:${id}` : `role:${role || "customer"}`
+      }:${validatedPage}:${validatedLimit}`;
 
     const cached = await cacheGet(cacheKey);
     if (cached) {
@@ -187,13 +194,14 @@ exports.loginGoogle = async (req, res) => {
     const decodedToken = await admin.auth().verifyIdToken(idToken);
     const email = decodedToken.email;
     const fullName = decodedToken.name;
-
+    const username = email
     let user = await User.findOne({ email });
     let isNew = false;
     if (!user) {
       user = await User.create({
         email,
         fullName,
+        username,
         role: "customer",
         provider: "google",
       });
@@ -238,9 +246,8 @@ exports.forgotPassword = async (req, res) => {
     user.resetTokenExpires = expires;
     await user.save();
 
-    const resetLink = `${
-      process.env.FRONTEND_URL || process.env.BASE_URL
-    }/reset-password?token=${resetToken}`;
+    const resetLink = `${process.env.FRONTEND_URL || process.env.BASE_URL
+      }/reset-password?token=${resetToken}`;
     const transporter = nodemailer.createTransport({
       service: "gmail",
       auth: {

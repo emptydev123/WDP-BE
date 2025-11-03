@@ -188,7 +188,7 @@ router.get(
  * @swagger
  * /api/appointment/create:
  *   post:
- *     summary: Tạo appointment mới (có kiểm tra điều kiện nâng cao)
+ *     summary: Tạo appointment mới với tự động phân công technician
  *     tags: [Appointments]
  *     security:
  *       - bearerAuth: []
@@ -235,9 +235,17 @@ router.get(
  *                 type: string
  *                 example: "66e0f04908abb1b3a1334e56"
  *                 description: ID loại dịch vụ bảo dưỡng (bắt buộc)
+ *               technician_id:
+ *                 type: string
+ *                 example: "670a5c290fa49362a0536e27"
+ *                 description: |
+ *                   ID kỹ thuật viên được chọn (optional):
+ *                   - Nếu bỏ trống hoặc không gửi: Hệ thống sẽ tự động phân công technician phù hợp
+ *                   - Tự động chọn technician còn slot, không bận vào thời gian đó, và ưu tiên người có ít appointments nhất
+ *                   - Mỗi technician tối đa 4 slot/ngày
  *     responses:
  *       201:
- *         description: Tạo appointment thành công (đã tạo payment tạm ứng 2000 VND)
+ *         description: Tạo appointment thành công (đã tạo payment tạm ứng 2000 VND và tự động phân công technician nếu cần)
  *         content:
  *           application/json:
  *             schema:
@@ -245,7 +253,7 @@ router.get(
  *               properties:
  *                 message:
  *                   type: string
- *                   example: "Tạo appointment thành công và tạo payment link tạm ứng"
+ *                   example: "Tạo appointment thành công. Hệ thống đã tự động phân công technician."
  *                 success:
  *                   type: boolean
  *                 data:
@@ -275,6 +283,12 @@ router.get(
  *                     service_type_id:
  *                       type: object
  *                       description: Thông tin loại dịch vụ
+ *                     technician_id:
+ *                       type: object
+ *                       description: Kỹ thuật viên đã được chỉ định hoặc tự động phân công
+ *                     assigned:
+ *                       type: object
+ *                       description: Kỹ thuật viên đã được assign (giống technician_id)
  *                     payment_id:
  *                       type: object
  *                       description: Thông tin thanh toán tạm ứng
@@ -285,7 +299,13 @@ router.get(
  *                       type: string
  *                       format: date-time
  *       400:
- *         description: Thiếu thông tin bắt buộc hoặc vi phạm quy tắc đặt lịch
+   *         description: |
+ *           Lỗi validation:
+ *           - Thiếu thông tin bắt buộc
+ *           - Vi phạm quy tắc đặt lịch (trùng lịch, overlap thời gian)
+ *           - Technician đã đủ 4 slot/ngày hoặc đang bận
+ *           - Không tìm thấy technician khả dụng (khi không chọn technician)
+ *           - Không còn slot trống cho ngày này
  *       401:
  *         description: Không có quyền truy cập
  *       404:
@@ -300,152 +320,92 @@ router.post(
   appointment.createAppointment
 );
 
-/**
- * @swagger
- * /api/appointment/technician-schedule:
- *   get:
- *     summary: Xem lịch làm việc của technician(s)
- *     tags: [Appointments]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: query
- *         name: technician_id
- *         required: false
- *         schema:
- *           type: string
- *         description: ID của technician (nếu không có thì lấy tất cả technician)
- *       - in: query
- *         name: date_from
- *         required: true
- *         schema:
- *           type: string
- *           format: date
- *         example: "2024-01-01"
- *         description: Ngày bắt đầu (YYYY-MM-DD)
- *       - in: query
- *         name: date_to
- *         required: true
- *         schema:
- *           type: string
- *           format: date
- *         example: "2024-01-31"
- *         description: Ngày kết thúc (YYYY-MM-DD)
- *       - in: query
- *         name: page
- *         schema:
- *           type: integer
- *           default: 1
- *         description: Số trang (chỉ áp dụng khi không có technician_id)
- *       - in: query
- *         name: limit
- *         schema:
- *           type: integer
- *           default: 10
- *         description: Số item per page (chỉ áp dụng khi không có technician_id)
- *     responses:
- *       200:
- *         description: Success
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   type: string
- *                 success:
- *                   type: boolean
- *                 data:
- *                   oneOf:
- *                     - type: object
- *                       description: Khi có technician_id - chi tiết lịch của 1 technician
- *                       properties:
- *                         technician:
- *                           type: object
- *                         date_range:
- *                           type: object
- *                         schedules:
- *                           type: array
- *                         total_assignments:
- *                           type: number
- *                     - type: object
- *                       description: Khi không có technician_id - danh sách tất cả technician
- *                       properties:
- *                         technicians:
- *                           type: array
- *                         pagination:
- *                           type: object
- *       400:
- *         description: Bad request
- *       404:
- *         description: Technician not found
- */
-router.get(
-  "/technician-schedule",
-  auth.authMiddleWare,
-  appointment.getTechnicianSchedule
-);
+// /**
+//  * @swagger
+//  * /api/appointment/technician-schedule:
+//  *   get:
+//  *     summary: Xem lịch làm việc của technician(s)
+//  *     tags: [Appointments]
+//  *     security:
+//  *       - bearerAuth: []
+//  *     parameters:
+//  *       - in: query
+//  *         name: technician_id
+//  *         required: false
+//  *         schema:
+//  *           type: string
+//  *         description: ID của technician (nếu không có thì lấy tất cả technician)
+//  *       - in: query
+//  *         name: date_from
+//  *         required: true
+//  *         schema:
+//  *           type: string
+//  *           format: date
+//  *         example: "2024-01-01"
+//  *         description: Ngày bắt đầu (YYYY-MM-DD)
+//  *       - in: query
+//  *         name: date_to
+//  *         required: true
+//  *         schema:
+//  *           type: string
+//  *           format: date
+//  *         example: "2024-01-31"
+//  *         description: Ngày kết thúc (YYYY-MM-DD)
+//  *       - in: query
+//  *         name: page
+//  *         schema:
+//  *           type: integer
+//  *           default: 1
+//  *         description: Số trang (chỉ áp dụng khi không có technician_id)
+//  *       - in: query
+//  *         name: limit
+//  *         schema:
+//  *           type: integer
+//  *           default: 10
+//  *         description: Số item per page (chỉ áp dụng khi không có technician_id)
+//  *     responses:
+//  *       200:
+//  *         description: Success
+//  *         content:
+//  *           application/json:
+//  *             schema:
+//  *               type: object
+//  *               properties:
+//  *                 message:
+//  *                   type: string
+//  *                 success:
+//  *                   type: boolean
+//  *                 data:
+//  *                   oneOf:
+//  *                     - type: object
+//  *                       description: Khi có technician_id - chi tiết lịch của 1 technician
+//  *                       properties:
+//  *                         technician:
+//  *                           type: object
+//  *                         date_range:
+//  *                           type: object
+//  *                         schedules:
+//  *                           type: array
+//  *                         total_assignments:
+//  *                           type: number
+//  *                     - type: object
+//  *                       description: Khi không có technician_id - danh sách tất cả technician
+//  *                       properties:
+//  *                         technicians:
+//  *                           type: array
+//  *                         pagination:
+//  *                           type: object
+//  *       400:
+//  *         description: Bad request
+//  *       404:
+//  *         description: Technician not found
+//  */
+// router.get(
+//   "/technician-schedule",
+//   auth.authMiddleWare,
+//   appointment.getTechnicianSchedule
+// );
 
-/**
- * @swagger
- * /api/appointment/assign-technician:
- *   put:
- *     summary: Gán technician cho appointment (Auto check conflict & tính end time)
- *     tags: [Appointments]
- *     security:
- *       - bearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - appointment_id
- *               - technician_id
- *             properties:
- *               appointment_id:
- *                 type: string
- *                 example: "68e0f04908abb1b3a1334e52"
- *                 description: ID của appointment
- *               technician_id:
- *                 type: string
- *                 example: "68d4e34293dfe03972909142"
- *                 description: ID của technician
- *     responses:
- *       200:
- *         description: Assign thành công
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                 data:
- *                   type: object
- *                   properties:
- *                     appointment:
- *                       type: object
- *                     estimated_completion:
- *                       type: string
- *                       example: "11:00"
- *                       description: Thời gian ước tính hoàn thành
- *       400:
- *         description: Technician đang bận (conflict về thời gian)
- *       401:
- *         description: Unauthorized
- *       404:
- *         description: Không tìm thấy appointment hoặc technician
- *       500:
- *         description: Lỗi server
- */
-router.put(
-  "/assign-technician",
-  auth.authMiddleWare,
-  auth.requireRole("customer", "staff", "admin"),
-  appointment.assignTechnician
-);
 
 /**
  * @swagger

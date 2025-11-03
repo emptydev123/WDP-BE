@@ -11,7 +11,7 @@ const vehicleSchema = new schema({
         type: String
     },
     purchase_date: {
-        type: String,
+        type: Date,
     },
     current_miliage: {
         type: Number
