@@ -1,6 +1,7 @@
 ﻿const { PayOS } = require("@payos/node");
 const User = require("../model/user");
 const Payment = require("../model/payment");
+const Appointment = require("../model/appointment");
 const {
   createPagination,
   createPaginatedResponse,
@@ -208,6 +209,20 @@ exports.updatePaymentStatus = async (req, res) => {
       payment.paid_at = new Date();
     }
     await payment.save();
+
+    // Khi payment status = "paid", cập nhật estimated_cost = 0 cho appointment
+    if (status === "paid") {
+      // Tìm appointment có payment_id hoặc final_payment_id tương ứng
+      await Appointment.updateMany(
+        {
+          $or: [{ payment_id: payment._id }, { final_payment_id: payment._id }],
+        },
+        { estimated_cost: 0 }
+      );
+      console.log(
+        `Updated estimated_cost = 0 for appointments with payment ${payment._id}`
+      );
+    }
 
     console.log(` Cập nhật trạng thái thanh toán: ${order_code} -> ${status}`);
 
@@ -478,6 +493,21 @@ exports.handlePayOSWebhook = async (req, res) => {
       );
 
       console.log("Updated payment:", updatedPayment ? "SUCCESS" : "NOT FOUND");
+
+      if (status === "PAID" && updatedPayment) {
+        await Appointment.updateMany(
+          {
+            $or: [
+              { payment_id: updatedPayment._id },
+              { final_payment_id: updatedPayment._id },
+            ],
+          },
+          { estimated_cost: 0 }
+        );
+        console.log(
+          `Updated estimated_cost = 0 for appointments with payment ${updatedPayment._id}`
+        );
+      }
     }
 
     console.log("=== WEBHOOK PROCESSING COMPLETE ===");

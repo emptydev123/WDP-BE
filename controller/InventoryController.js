@@ -31,7 +31,16 @@ exports.getAllInventory = async (req, res) => {
       query.center_id = center_id;
     }
     if (part_name) {
-      query["part_id.name"] = { $regex: part_name, $options: "i" };
+      // Tìm part theo part_name thông qua populate
+      const parts = await Part.find({
+        part_name: { $regex: part_name, $options: "i" },
+      });
+      if (parts.length > 0) {
+        query.part_id = { $in: parts.map((p) => p._id) };
+      } else {
+        // Nếu không tìm thấy part nào, trả về empty result
+        query.part_id = { $in: [] };
+      }
     }
     if (low_stock === "true") {
       query.$expr = {
@@ -43,7 +52,10 @@ exports.getAllInventory = async (req, res) => {
     const pagination = createPagination(validatedPage, validatedLimit, total);
 
     const inventory = await Inventory.find(query)
-      .populate("part_id", "name description part_number category brand")
+      .populate(
+        "part_id",
+        "part_name description part_number supplier warranty_month"
+      )
       .populate("center_id", "name address phone")
       .sort({ updatedAt: -1 })
       .skip(pagination.skip)
@@ -87,7 +99,10 @@ exports.getInventoryById = async (req, res) => {
     }
 
     const inventory = await Inventory.findById(inventoryId)
-      .populate("part_id", "name description part_number category brand")
+      .populate(
+        "part_id",
+        "part_name description part_number supplier warranty_month"
+      )
       .populate("center_id", "name address phone");
 
     if (!inventory) {
@@ -178,7 +193,10 @@ exports.createInventory = async (req, res) => {
     await inventory.save();
 
     const populatedInventory = await Inventory.findById(inventory._id)
-      .populate("part_id", "name description part_number category brand")
+      .populate(
+        "part_id",
+        "part_name description part_number supplier warranty_month"
+      )
       .populate("center_id", "name address phone");
 
     return res.status(201).json({
@@ -239,7 +257,10 @@ exports.updateInventory = async (req, res) => {
       updateData,
       { new: true, runValidators: true }
     )
-      .populate("part_id", "name description part_number category brand")
+      .populate(
+        "part_id",
+        "part_name description part_number supplier warranty_month"
+      )
       .populate("center_id", "name address phone");
 
     return res.status(200).json({

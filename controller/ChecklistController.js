@@ -244,17 +244,16 @@ exports.acceptChecklist = async (req, res) => {
     let totalCost = 0;
     const inventoryUpdates = [];
 
-    // Kiểm tra inventory và tính cost cho tất cả parts
-    // Lấy giá từ inventory.cost_per_unit thay vì từ parts
     for (const part of checklist.parts) {
-      // Đảm bảo part_id đã được populate
       const partId = part.part_id?._id || part.part_id;
 
-      // Tìm inventory cho part này
       const inventory = await Inventory.findOne({
         part_id: partId,
         center_id: appointment.center_id,
-      });
+      }).populate(
+        "part_id",
+        "part_name description part_number supplier warranty_month"
+      );
 
       if (!inventory) {
         return res.status(400).json({
@@ -307,8 +306,6 @@ exports.acceptChecklist = async (req, res) => {
     console.log(`Tổng cost: ${totalCost}`);
     console.log(`Cập nhật ${inventoryUpdates.length} inventory items cùng lúc`);
 
-    // Cập nhật TẤT CẢ inventory cùng lúc (atomic updates)
-    // Sử dụng Promise.all để update song song nhiều inventory items
     const inventoryUpdateResults = await Promise.all(
       inventoryUpdates.map(async (update) => {
         const result = await Inventory.findByIdAndUpdate(
@@ -327,7 +324,6 @@ exports.acceptChecklist = async (req, res) => {
     checklist.status = "accepted";
     await checklist.save();
 
-    // Cập nhật appointment với estimated cost và chuyển status thành "in_progress"
     await Appointment.findByIdAndUpdate(appointment._id, {
       estimated_cost: totalCost,
       status: "in_progress",
@@ -339,10 +335,6 @@ exports.acceptChecklist = async (req, res) => {
       .populate("appointment_id")
       .populate("parts.part_id")
       .lean();
-
-    console.log(
-      `Checklist ${checklistId} updated. Status = ${updatedChecklist.status}, Total cost = ${totalCost} (saved to appointment)`
-    );
 
     return res.status(200).json({
       message: "Checklist đã được chấp nhận, inventory đã cập nhật",

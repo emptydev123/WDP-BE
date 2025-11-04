@@ -1486,7 +1486,7 @@ exports.createAppointment = async (req, res) => {
       appoinment_date: new Date(appoinment_date),
       appoinment_time,
       notes,
-      estimated_cost: serviceType.base_price || 0,
+      estimated_cost: 2000, // Set estimated_cost ban đầu là 2000
       user_id,
       vehicle_id,
       center_id,
