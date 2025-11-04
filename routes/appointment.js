@@ -299,7 +299,7 @@ router.get(
  *                       type: string
  *                       format: date-time
  *       400:
-   *         description: |
+ *         description: |
  *           Lỗi validation:
  *           - Thiếu thông tin bắt buộc
  *           - Vi phạm quy tắc đặt lịch (trùng lịch, overlap thời gian)
@@ -405,7 +405,6 @@ router.post(
 //   auth.authMiddleWare,
 //   appointment.getTechnicianSchedule
 // );
-
 
 /**
  * @swagger

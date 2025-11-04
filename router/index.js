@@ -10,9 +10,8 @@ const serviceCenterRouter = require("../routes/servicecenter");
 const inventoryRouter = require("../routes/inventory");
 const partsRouter = require("../routes/parts");
 const issueTypeRouter = require("../routes/issueType");
-const notificationRouter = require('../routes/notification');
+const notificationRouter = require("../routes/notification");
 const checklistRouter = require("../routes/checklist");
-const checkinRouter = require("../routes/checkin");
 const dashboardRouter = require("../routes/dashboard");
 const PaymentController = require("../controller/PaymentController");
 
@@ -31,8 +30,6 @@ router.use("/parts", partsRouter);
 router.use("/issue-types", issueTypeRouter);
 router.use("/notifications", notificationRouter);
 router.use("/checklist", checklistRouter);
-router.use("/checkin", checkinRouter);
 router.use("/dashboard", dashboardRouter);
-
 
 module.exports = router;

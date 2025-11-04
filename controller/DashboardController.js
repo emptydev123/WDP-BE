@@ -1,7 +1,6 @@
 // controller/DashboardController.js
 const Payment = require("../model/payment");
 const Appointment = require("../model/appointment");
-const Checkin = require("../model/checkin");
 const User = require("../model/user");
 
 // Doanh thu từ Payments (PAID)
@@ -286,10 +285,10 @@ exports.getAppointmentRate = async (req, res) => {
   }
 };
 
-// Tỷ lệ check-in
+// Tỷ lệ check-in (dựa trên appointment có checkin_datetime)
 exports.getCheckinRate = async (req, res) => {
   try {
-    const { date_from, date_to, appointment_id } = req.query;
+    const { date_from, date_to, center_id } = req.query;
     const userId = req._id?.toString();
 
     if (!userId) {
@@ -299,42 +298,60 @@ exports.getCheckinRate = async (req, res) => {
       });
     }
 
-    // Filter theo thời gian
+    // Filter theo thời gian (appointment date)
     const filter = {};
     if (date_from || date_to) {
-      filter.checkin_datetime = {};
+      filter.appoinment_date = {};
       if (date_from) {
         const fromDate = new Date(date_from);
         fromDate.setHours(0, 0, 0, 0);
-        filter.checkin_datetime.$gte = fromDate;
+        filter.appoinment_date.$gte = fromDate;
       }
       if (date_to) {
         const toDate = new Date(date_to);
         toDate.setHours(23, 59, 59, 999);
-        filter.checkin_datetime.$lte = toDate;
+        filter.appoinment_date.$lte = toDate;
       }
     }
 
-    if (appointment_id) {
-      filter.appointment_id = appointment_id;
+    if (center_id) {
+      filter.center_id = center_id;
     }
 
-    // Đếm checkin theo status
-    const checkinStats = await Checkin.aggregate([
+    // Đếm appointments theo checkin_by và có check_in_time
+    const checkinStats = await Appointment.aggregate([
       { $match: filter },
       {
+        $match: {
+          $or: [
+            { check_in_time: { $ne: null } },
+            { checkin_datetime: { $ne: null } }, // Tương thích với dữ liệu cũ
+          ],
+        },
+      },
+      {
         $group: {
-          _id: "$checkin_status",
+          _id: "$checkin_by",
           count: { $sum: 1 },
         },
       },
     ]);
 
+    // Tổng số appointments trong khoảng thời gian
+    const totalAppointments = await Appointment.countDocuments(filter);
+
+    // Tổng số appointments đã check-in
+    const totalCheckins = await Appointment.countDocuments({
+      ...filter,
+      $or: [
+        { check_in_time: { $ne: null } },
+        { checkin_datetime: { $ne: null } }, // Tương thích với dữ liệu cũ
+      ],
+    });
+
     const stats = {
-      on_time: 0,
-      early: 0,
-      late: 0,
-      delay: 0,
+      customer: 0,
+      staff: 0,
     };
 
     checkinStats.forEach((stat) => {
@@ -343,30 +360,28 @@ exports.getCheckinRate = async (req, res) => {
       }
     });
 
-    const total = Object.values(stats).reduce((a, b) => a + b, 0);
-    const onTimeCount = stats.on_time;
-    const earlyCount = stats.early;
-    const lateCount = stats.late;
-    const delayCount = stats.delay;
-
-    const onTimeRate = total > 0 ? ((onTimeCount / total) * 100).toFixed(2) : 0;
-    const earlyRate = total > 0 ? ((earlyCount / total) * 100).toFixed(2) : 0;
-    const lateRate = total > 0 ? ((lateCount / total) * 100).toFixed(2) : 0;
-    const delayRate = total > 0 ? ((delayCount / total) * 100).toFixed(2) : 0;
+    const checkinRate =
+      totalAppointments > 0
+        ? ((totalCheckins / totalAppointments) * 100).toFixed(2)
+        : 0;
+    const customerCheckinRate =
+      totalCheckins > 0
+        ? ((stats.customer / totalCheckins) * 100).toFixed(2)
+        : 0;
+    const staffCheckinRate =
+      totalCheckins > 0 ? ((stats.staff / totalCheckins) * 100).toFixed(2) : 0;
 
     return res.status(200).json({
       message: "Lấy tỷ lệ check-in thành công",
       success: true,
       data: {
-        total,
-        onTimeCount,
-        earlyCount,
-        lateCount,
-        delayCount,
-        onTimeRate: parseFloat(onTimeRate),
-        earlyRate: parseFloat(earlyRate),
-        lateRate: parseFloat(lateRate),
-        delayRate: parseFloat(delayRate),
+        totalAppointments,
+        totalCheckins,
+        checkinRate: parseFloat(checkinRate),
+        customerCheckins: stats.customer,
+        staffCheckins: stats.staff,
+        customerCheckinRate: parseFloat(customerCheckinRate),
+        staffCheckinRate: parseFloat(staffCheckinRate),
         breakdown: stats,
         period: {
           from: date_from || null,
@@ -469,23 +484,28 @@ exports.getDashboardOverview = async (req, res) => {
           },
         ]),
 
-        // Checkin rate
-        Checkin.aggregate([
+        // Checkin rate (appointments có check_in_time hoặc checkin_datetime)
+        Appointment.aggregate([
           {
             $match: {
               ...(date_from || date_to
                 ? {
-                    checkin_datetime: {
+                    appoinment_date: {
                       ...(date_from ? { $gte: new Date(date_from) } : {}),
                       ...(date_to ? { $lte: new Date(date_to) } : {}),
                     },
                   }
                 : {}),
+              ...(center_id ? { center_id: center_id } : {}),
+              $or: [
+                { check_in_time: { $ne: null } },
+                { checkin_datetime: { $ne: null } }, // Tương thích với dữ liệu cũ
+              ],
             },
           },
           {
             $group: {
-              _id: "$checkin_status",
+              _id: "$checkin_by",
               count: { $sum: 1 },
             },
           },
@@ -548,10 +568,8 @@ exports.getDashboardOverview = async (req, res) => {
 
     // Xử lý Checkin Rate
     const checkinBreakdown = {
-      on_time: 0,
-      early: 0,
-      late: 0,
-      delay: 0,
+      customer: 0,
+      staff: 0,
     };
     checkinStats.forEach((stat) => {
       if (checkinBreakdown.hasOwnProperty(stat._id)) {
@@ -562,17 +580,17 @@ exports.getDashboardOverview = async (req, res) => {
       (a, b) => a + b,
       0
     );
-    const onTimeRate =
+    const customerCheckinRate =
       totalCheckins > 0
-        ? ((checkinBreakdown.on_time / totalCheckins) * 100).toFixed(2)
+        ? ((checkinBreakdown.customer / totalCheckins) * 100).toFixed(2)
         : 0;
-    const lateRate =
+    const staffCheckinRate =
       totalCheckins > 0
-        ? ((checkinBreakdown.late / totalCheckins) * 100).toFixed(2)
+        ? ((checkinBreakdown.staff / totalCheckins) * 100).toFixed(2)
         : 0;
-    const delayRate =
-      totalCheckins > 0
-        ? ((checkinBreakdown.delay / totalCheckins) * 100).toFixed(2)
+    const overallCheckinRate =
+      totalAppointments > 0
+        ? ((totalCheckins / totalAppointments) * 100).toFixed(2)
         : 0;
 
     return res.status(200).json({
@@ -596,15 +614,13 @@ exports.getDashboardOverview = async (req, res) => {
           breakdown: appointmentBreakdown,
         },
         checkinRate: {
-          total: totalCheckins,
-          onTime: checkinBreakdown.on_time,
-          onTimeRate: parseFloat(onTimeRate),
-          lateRate: parseFloat(lateRate),
-          delayRate: parseFloat(
-            totalCheckins > 0
-              ? ((checkinBreakdown.delay / totalCheckins) * 100).toFixed(2)
-              : 0
-          ),
+          totalAppointments,
+          totalCheckins,
+          overallCheckinRate: parseFloat(overallCheckinRate),
+          customerCheckins: checkinBreakdown.customer,
+          staffCheckins: checkinBreakdown.staff,
+          customerCheckinRate: parseFloat(customerCheckinRate),
+          staffCheckinRate: parseFloat(staffCheckinRate),
           breakdown: checkinBreakdown,
         },
         period: {

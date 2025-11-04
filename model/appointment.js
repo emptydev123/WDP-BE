@@ -16,12 +16,11 @@ const appointmentSchema = new schema(
       type: String,
       enum: [
         "pending",
-        "deposited",
-        "accepted",
         "assigned",
+        "check_in",
         "in_progress",
+        "repaired",
         "completed",
-        "paid",
         "canceled",
       ],
       default: "pending",
@@ -81,6 +80,16 @@ const appointmentSchema = new schema(
       required: false,
       default: null,
     },
+    checkin_by: {
+      type: mongoose.Types.ObjectId,
+      ref: "User",
+      required: false,
+    },
+    checkin_datetime: {
+      type: Date,
+      required: false,
+      default: null,
+    },
     check_in_type: {
       type: String,
       enum: ["offline", "online"],
@@ -90,7 +99,7 @@ const appointmentSchema = new schema(
       type: Date,
       required: false,
       default: null,
-    }
+    },
   },
   { timestamps: true }
 );

@@ -37,8 +37,12 @@ const checklistSchema = new schema(
     ],
     status: {
       type: String,
-      enum: ["pending", "accepted", "completed"],
+      enum: ["pending", "accepted", "completed", "canceled"],
       default: "pending",
+    },
+    cancellation_note: {
+      type: String,
+      required: false,
     },
   },
   { timestamps: true }

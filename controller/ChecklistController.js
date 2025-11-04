@@ -98,13 +98,22 @@ exports.createChecklist = async (req, res) => {
       });
     }
 
-    // Kiểm tra technician có được assign cho appointment này không
-    // if (appointment.technician_id?.toString() !== technician_id) {
-    //   return res.status(403).json({
-    //     message: "Bạn không có quyền tạo checklist cho appointment này",
-    //     success: false,
-    //   });
-    // }
+    // Kiểm tra appointment status phải là "assigned" để có thể tạo checklist và check-in
+    if (appointment.status !== "assigned") {
+      return res.status(400).json({
+        message:
+          "Chỉ có thể tạo checklist cho appointment có trạng thái 'assigned'",
+        success: false,
+      });
+    }
+
+    // Kiểm tra appointment đã được check-in chưa (tránh tạo checklist nhiều lần)
+    if (appointment.checkin_datetime || appointment.check_in_time) {
+      return res.status(400).json({
+        message: "Appointment đã được check-in rồi",
+        success: false,
+      });
+    }
 
     const issueType = await IssueType.findById(issue_type_id);
     if (!issueType) {
@@ -145,13 +154,30 @@ exports.createChecklist = async (req, res) => {
     });
 
     await checklist.save();
+
+    // Khi technician tạo checklist, đồng thời check-in appointment
+    appointment.status = "check_in";
+    appointment.checkin_by = technician_id; // Lưu ID của technician đã check-in
+    appointment.checkin_datetime = new Date();
+    appointment.check_in_type = "offline"; // Technician tạo checklist là check-in offline
+    appointment.check_in_time = new Date();
+    await appointment.save();
+
+    // Populate checklist với thông tin đầy đủ
     await checklist.populate([
       { path: "issue_type_id" },
+      {
+        path: "appointment_id",
+        populate: {
+          path: "checkin_by",
+          select: "username fullName email phone role",
+        },
+      },
       { path: "parts.part_id" },
     ]);
 
     return res.status(201).json({
-      message: "Tạo checklist thành công",
+      message: "Tạo checklist và check-in thành công",
       success: true,
       data: checklist,
     });
@@ -301,9 +327,10 @@ exports.acceptChecklist = async (req, res) => {
     checklist.status = "accepted";
     await checklist.save();
 
-    // Cập nhật appointment với estimated cost
+    // Cập nhật appointment với estimated cost và chuyển status thành "in_progress"
     await Appointment.findByIdAndUpdate(appointment._id, {
       estimated_cost: totalCost,
+      status: "in_progress",
     });
 
     // Reload checklist với populate để có đầy đủ thông tin
@@ -330,6 +357,119 @@ exports.acceptChecklist = async (req, res) => {
     console.error("Accept checklist error:", error);
     return res.status(500).json({
       message: "Lỗi chấp nhận checklist",
+      error: error.message,
+      success: false,
+    });
+  }
+};
+
+// Get checklist by ID
+exports.getChecklistById = async (req, res) => {
+  try {
+    const { checklistId } = req.params;
+    const userId = req._id?.toString();
+
+    if (!userId) {
+      return res.status(401).json({
+        message: "Unauthorized",
+        success: false,
+      });
+    }
+
+    const checklist = await Checklist.findById(checklistId)
+      .populate("issue_type_id")
+      .populate("appointment_id")
+      .populate("parts.part_id")
+      .lean();
+
+    if (!checklist) {
+      return res.status(404).json({
+        message: "Không tìm thấy checklist",
+        success: false,
+      });
+    }
+
+    return res.status(200).json({
+      message: "Lấy thông tin checklist thành công",
+      success: true,
+      data: checklist,
+    });
+  } catch (error) {
+    console.error("Get checklist by ID error:", error);
+    return res.status(500).json({
+      message: "Lỗi lấy thông tin checklist",
+      error: error.message,
+      success: false,
+    });
+  }
+};
+
+// Staff cancel checklist
+exports.cancelChecklist = async (req, res) => {
+  try {
+    const staff_id = req._id?.toString();
+    const { checklistId } = req.params;
+    const { note } = req.body;
+
+    if (!staff_id) {
+      return res.status(401).json({
+        message: "Unauthorized",
+        success: false,
+      });
+    }
+
+    // Kiểm tra role staff
+    const user = await User.findById(staff_id);
+    if (!["admin", "staff"].includes(user?.role)) {
+      return res.status(403).json({
+        message: "Access denied. Staff role required",
+        success: false,
+      });
+    }
+
+    const checklist = await Checklist.findById(checklistId).populate(
+      "appointment_id"
+    );
+
+    if (!checklist) {
+      return res.status(404).json({
+        message: "Checklist không tồn tại",
+        success: false,
+      });
+    }
+
+    // Chỉ có thể cancel checklist có status pending hoặc accepted
+    if (!["pending", "accepted"].includes(checklist.status)) {
+      return res.status(400).json({
+        message:
+          "Chỉ có thể hủy checklist có trạng thái 'pending' hoặc 'accepted'",
+        success: false,
+      });
+    }
+
+    // Cập nhật checklist
+    checklist.status = "canceled";
+    if (note) {
+      checklist.cancellation_note = note;
+    }
+    await checklist.save();
+
+    // Populate và trả về thông tin checklist đã được cancel
+    await checklist.populate([
+      { path: "issue_type_id" },
+      { path: "appointment_id" },
+      { path: "parts.part_id" },
+    ]);
+
+    return res.status(200).json({
+      message: "Checklist đã được hủy",
+      success: true,
+      data: checklist,
+    });
+  } catch (error) {
+    console.error("Cancel checklist error:", error);
+    return res.status(500).json({
+      message: "Lỗi hủy checklist",
       error: error.message,
       success: false,
     });
@@ -380,7 +520,7 @@ exports.completeChecklist = async (req, res) => {
 
     // Cập nhật appointment status thành completed
     await Appointment.findByIdAndUpdate(checklist.appointment_id._id, {
-      status: "completed",
+      status: "repaired",
     });
 
     await checklist.populate([
