@@ -210,17 +210,23 @@ exports.updatePaymentStatus = async (req, res) => {
     }
     await payment.save();
 
-    // Khi payment status = "paid", cập nhật estimated_cost = 0 cho appointment
+    // Khi payment status = "paid", cập nhật estimated_cost = 0 và status = "assigned" cho appointment
     if (status === "paid") {
       // Tìm appointment có payment_id hoặc final_payment_id tương ứng
-      await Appointment.updateMany(
+      // Chỉ cập nhật appointment đang pending
+      const updateResult = await Appointment.updateMany(
         {
           $or: [{ payment_id: payment._id }, { final_payment_id: payment._id }],
+          status: "pending", // Chỉ cập nhật appointment đang pending
+          estimated_cost: { $ne: 0 },
         },
-        { estimated_cost: 0 }
+        {
+          estimated_cost: 0,
+          status: "assigned", // Cập nhật status thành assigned khi đã thanh toán
+        }
       );
       console.log(
-        `Updated estimated_cost = 0 for appointments with payment ${payment._id}`
+        `Updated ${updateResult.modifiedCount} appointments with payment ${payment._id} (status -> assigned, estimated_cost -> 0)`
       );
     }
 
@@ -482,6 +488,27 @@ exports.handlePayOSWebhook = async (req, res) => {
         JSON.stringify(req.body)
       );
     } else {
+      // Kiểm tra payment hiện tại
+      const existingPayment = await Payment.findOne({
+        orderCode: Number(orderCode),
+      });
+
+      // Nếu đã PAID và webhook lại đến, không cần xử lý lại (idempotency)
+      if (
+        existingPayment &&
+        existingPayment.status === "PAID" &&
+        status === "PAID"
+      ) {
+        console.log(
+          `[Webhook] Payment ${orderCode} đã PAID trước đó, bỏ qua duplicate webhook`
+        );
+        return res.json({
+          error: 0,
+          message: "Ok (duplicate webhook ignored)",
+          data: { orderCode, status: "PAID", duplicate: true },
+        });
+      }
+
       const updatedPayment = await Payment.findOneAndUpdate(
         { orderCode: Number(orderCode) },
         {
@@ -494,23 +521,29 @@ exports.handlePayOSWebhook = async (req, res) => {
 
       console.log("Updated payment:", updatedPayment ? "SUCCESS" : "NOT FOUND");
 
+      // Chỉ cập nhật appointment khi status = PAID và payment đã được update
       if (status === "PAID" && updatedPayment) {
-        await Appointment.updateMany(
+        // Đảm bảo không cập nhật nhiều lần (idempotency)
+        // Chỉ cập nhật appointment có status = "pending" và chưa có estimated_cost = 0
+        const updateResult = await Appointment.updateMany(
           {
             $or: [
               { payment_id: updatedPayment._id },
               { final_payment_id: updatedPayment._id },
             ],
+            status: "pending", // Chỉ cập nhật appointment đang pending
+            estimated_cost: { $ne: 0 },
           },
-          { estimated_cost: 0 }
+          {
+            estimated_cost: 0,
+            status: "assigned", // Cập nhật status thành assigned khi đã thanh toán
+          }
         );
         console.log(
-          `Updated estimated_cost = 0 for appointments with payment ${updatedPayment._id}`
+          `Updated ${updateResult.modifiedCount} appointments with payment ${updatedPayment._id} (status -> assigned, estimated_cost -> 0)`
         );
       }
     }
-
-    console.log("=== WEBHOOK PROCESSING COMPLETE ===");
 
     return res.json({ error: 0, message: "Ok", data: { orderCode, status } });
   } catch (error) {
@@ -525,7 +558,6 @@ exports.handlePayOSWebhook = async (req, res) => {
   }
 };
 
-// ========== RETRY PAYMENT ==========
 exports.retryPayment = async (req, res) => {
   try {
     const { id } = req.params;
@@ -877,158 +909,6 @@ exports.debugAllPayments = async (req, res) => {
     return res.status(500).json({
       message: "Debug failed",
       error: error.message,
-      success: false,
-    });
-  }
-};
-
-// ========== TEST RETRY FUNCTIONALITY ==========
-exports.testRetryFunctionality = async (req, res) => {
-  try {
-    const { orderCode } = req.params;
-
-    if (!orderCode) {
-      return res.status(400).json({
-        message: "Missing orderCode parameter",
-        success: false,
-      });
-    }
-
-    const payment = await Payment.findOne({ orderCode: Number(orderCode) });
-
-    if (!payment) {
-      return res.status(404).json({
-        message: "Payment not found",
-        success: false,
-      });
-    }
-
-    const retryInfo = {
-      orderCode: payment.orderCode,
-      status: payment.status,
-      canRetry: canRetryPayment(payment),
-      timeoutAt: payment.timeoutAt,
-      isTimeout: isTimeout(payment),
-      retryOf: payment.retryOf,
-      replacedBy: payment.replacedBy,
-    };
-
-    console.log("Retry functionality test:", retryInfo);
-
-    return res.json({
-      message: "Retry functionality test completed",
-      success: true,
-      data: retryInfo,
-    });
-  } catch (error) {
-    console.error("Test retry functionality error:", error);
-    return res.status(500).json({
-      message: "Internal server error",
-      success: false,
-    });
-  }
-};
-
-// ========== GET PAYMENT HISTORY BY APPOINTMENT ==========
-exports.getPaymentHistoryByAppointment = async (req, res) => {
-  try {
-    const { appointmentId } = req.params;
-    const userId = req._id?.toString();
-
-    if (!userId) {
-      return res.status(401).json({
-        message: "Unauthorized",
-        success: false,
-      });
-    }
-
-    if (!appointmentId) {
-      return res.status(400).json({
-        message: "Missing appointmentId parameter",
-        success: false,
-      });
-    }
-
-    // Tìm appointment
-    const Appointment = require("../model/appointment");
-    const appointment = await Appointment.findOne({
-      _id: appointmentId,
-      user_id: userId,
-    }).populate("payment_id final_payment_id");
-
-    if (!appointment) {
-      return res.status(404).json({
-        message: "Appointment not found",
-        success: false,
-      });
-    }
-
-    // Tìm tất cả payments liên quan
-    const paymentIds = [];
-    if (appointment.payment_id) paymentIds.push(appointment.payment_id._id);
-
-    // Tìm payments gốc và retry chain
-    const originalPayments = await Payment.find({
-      _id: { $in: paymentIds },
-    });
-
-    const orderCodes = originalPayments.map((p) => p.orderCode);
-    const retryPayments = await Payment.find({
-      $or: [
-        { retryOf: { $in: orderCodes } },
-        { replacedBy: { $in: orderCodes } },
-      ],
-    });
-
-    const allPayments = [...originalPayments, ...retryPayments].sort(
-      (a, b) => new Date(a.createdAt) - new Date(b.createdAt)
-    );
-
-    const paymentHistory = allPayments.map((p) => ({
-      orderCode: p.orderCode,
-      status: p.status,
-      amount: p.amount,
-      description: p.description,
-      createdAt: p.createdAt,
-      updatedAt: p.updatedAt,
-      paidAt: p.paidAt,
-      cancelledAt: p.cancelledAt,
-      timeoutAt: p.timeoutAt,
-      retryOf: p.retryOf,
-      replacedBy: p.replacedBy,
-      canRetry: canRetryPayment(p),
-      isTimeout: isTimeout(p),
-      isCurrent: p._id.toString() === appointment.payment_id?._id?.toString(),
-    }));
-
-    console.log("Payment history for appointment:", {
-      appointmentId,
-      totalPayments: paymentHistory.length,
-      currentPayment: paymentHistory.find((p) => p.isCurrent),
-    });
-
-    return res.json({
-      message: "Payment history retrieved successfully",
-      success: true,
-      data: {
-        appointmentId,
-        currentPayment: paymentHistory.find((p) => p.isCurrent),
-        paymentHistory,
-        summary: {
-          totalPayments: paymentHistory.length,
-          paidPayments: paymentHistory.filter((p) => p.status === "PAID")
-            .length,
-          pendingPayments: paymentHistory.filter((p) => p.status === "PENDING")
-            .length,
-          failedPayments: paymentHistory.filter((p) => p.status === "FAILED")
-            .length,
-        },
-      },
-    });
-  } catch (error) {
-    console.error("Get payment history by appointment error:", error);
-    return res.status(500).json({
-      message: "Internal server error",
       success: false,
     });
   }

@@ -78,7 +78,7 @@ exports.getAppointments = async (req, res) => {
         $gte: startOfToday,
         $lte: endOfToday,
       };
-      query.status = { $in: ["in_progress", "assigned", "accepted"] };
+      query.status = { $in: ["in_progress", "assigned", "check_in"] };
       query.technician_id = { $ne: null };
     }
 
@@ -217,12 +217,14 @@ exports.getTechnicianSchedule = async (req, res) => {
       }
 
       const schedules = await Appointment.find({
-        assigned: technician_id,
+        technician_id: technician_id,
         appoinment_date: {
           $gte: fromDate,
           $lte: toDate,
         },
-        status: { $in: ["accepted", "assigned", "in_progress", "completed"] },
+        status: {
+          $in: ["assigned", "check_in", "in_progress", "repaired", "completed"],
+        },
       })
         .populate("user_id", "fullName phone")
         .populate("vehicle_id", "license_plate brand model")
@@ -283,7 +285,15 @@ exports.getTechnicianSchedule = async (req, res) => {
             $gte: fromDate,
             $lte: toDate,
           },
-          status: { $in: ["accepted", "assigned", "in_progress", "completed"] },
+          status: {
+            $in: [
+              "assigned",
+              "check_in",
+              "in_progress",
+              "repaired",
+              "completed",
+            ],
+          },
         })
           .populate("user_id", "fullName phone")
           .populate("vehicle_id", "license_plate brand model")
@@ -521,17 +531,18 @@ exports.updateAppointmentStatus = async (req, res) => {
 
     const validStatuses = [
       "pending",
-      "accepted",
-      "deposited",
+      "assigned",
+      "check_in",
       "in_progress",
+      "repaired",
       "completed",
-      "paid",
+      "delay",
       "canceled",
     ];
     if (!validStatuses.includes(status)) {
       return res.status(400).json({
         message:
-          "Status không hợp lệ. Chỉ chấp nhận: pending, accepted, deposited, in_progress, completed, paid, canceled",
+          "Status không hợp lệ. Chỉ chấp nhận: pending, assigned, check_in, in_progress, repaired, completed, delay, canceled",
         success: false,
       });
     }
@@ -568,17 +579,8 @@ exports.updateAppointmentStatus = async (req, res) => {
       }
     }
 
-    if (oldStatus === "pending" && status === "deposited") {
-      const depositAmount = appointment.payment_id?.amount || 100000;
-      appointment.estimated_cost = Math.max(
-        0,
-        appointment.estimated_cost - depositAmount
-      );
-    }
-
-    if (status === "paid") {
-      appointment.estimated_cost = 0;
-    }
+    // Logic xử lý estimated_cost khi status thay đổi
+    // estimated_cost được quản lý bởi payment flow (set 0 khi payment paid)
 
     await appointment.save();
 
@@ -874,9 +876,10 @@ exports.createFinalPayment = async (req, res) => {
       });
     }
 
-    if (appointment.status !== "completed") {
+    if (appointment.status !== "repaired") {
       return res.status(400).json({
-        message: "Chỉ có thể tạo final payment cho appointment đã hoàn thành",
+        message:
+          "Chỉ có thể tạo final payment cho appointment đã sửa chữa xong",
         success: false,
       });
     }
@@ -952,8 +955,7 @@ exports.createFinalPayment = async (req, res) => {
         .populate("user_id", "username fullName email phone")
         .populate("center_id", "name address phone")
         .populate("vehicle_id", "license_plate brand model year")
-        .populate("assigned_by", "username fullName email phone role")
-        .populate("assigned", "username fullName email phone role")
+        .populate("technician_id", "username fullName email phone role")
         .populate("payment_id", "order_code amount status checkout_url qr_code")
         .populate(
           "final_payment_id",
@@ -1113,15 +1115,14 @@ exports.autoAssignTechnician = async ({
       }
 
       // 1. Kiểm tra technician đã đủ 4 slot trong ngày chưa
-      // Check cả assigned và technician_id để đảm bảo không bỏ sót
       const appointmentsInDay = await Appointment.countDocuments({
-        $or: [{ assigned: techUserId }, { technician_id: techUserId }],
+        technician_id: techUserId,
         appoinment_date: {
           $gte: appointmentDate,
           $lte: appointmentDateEnd,
         },
         status: {
-          $in: ["pending", "accepted", "assigned", "in_progress", "deposited"],
+          $in: ["pending", "assigned", "check_in", "in_progress"],
         },
       });
 
@@ -1132,13 +1133,13 @@ exports.autoAssignTechnician = async ({
 
       // 2. Kiểm tra technician có bận vào thời gian này không
       const conflictingAppointments = await Appointment.find({
-        $or: [{ assigned: techUserId }, { technician_id: techUserId }],
+        technician_id: techUserId,
         appoinment_date: {
           $gte: appointmentDate,
           $lte: appointmentDateEnd,
         },
         status: {
-          $in: ["pending", "accepted", "assigned", "in_progress", "deposited"],
+          $in: ["pending", "assigned", "check_in", "in_progress"],
         },
       })
         .populate("service_type_id")
@@ -1331,11 +1332,11 @@ exports.createAppointment = async (req, res) => {
       status: {
         $in: [
           "pending",
-          "confirmed",
+          "assigned",
+          "check_in",
           "in_progress",
-          "deposited",
+          "repaired",
           "completed",
-          "paid",
         ],
       },
     }).populate("service_type_id center_id vehicle_id");
@@ -1386,13 +1387,13 @@ exports.createAppointment = async (req, res) => {
       appointmentDateEnd.setHours(23, 59, 59, 999);
 
       const appointmentsInDay = await Appointment.countDocuments({
-        $or: [{ assigned: technician_id }, { technician_id: technician_id }],
+        technician_id: technician_id,
         appoinment_date: {
           $gte: appointmentDate,
           $lte: appointmentDateEnd,
         },
         status: {
-          $in: ["pending", "accepted", "assigned", "in_progress", "deposited"],
+          $in: ["pending", "assigned", "check_in", "in_progress"],
         },
       });
 
@@ -1406,13 +1407,13 @@ exports.createAppointment = async (req, res) => {
 
       // Kiểm tra conflict thời gian
       const conflictingAppointments = await Appointment.find({
-        $or: [{ assigned: technician_id }, { technician_id: technician_id }],
+        technician_id: technician_id,
         appoinment_date: {
           $gte: appointmentDate,
           $lte: appointmentDateEnd,
         },
         status: {
-          $in: ["pending", "accepted", "assigned", "in_progress", "deposited"],
+          $in: ["pending", "assigned", "check_in", "in_progress"],
         },
       })
         .populate("service_type_id")
@@ -1493,7 +1494,6 @@ exports.createAppointment = async (req, res) => {
       service_type_id,
       status: "pending",
       technician_id: selectedTechnician,
-      assigned: selectedTechnician, // Cũng set vào assigned field
     });
 
     await appointment.save();
@@ -1513,7 +1513,6 @@ exports.createAppointment = async (req, res) => {
       .populate("user_id", "username fullName email phone")
       .populate("center_id", "center_name address phone")
       .populate("vehicle_id", "license_plate vin")
-      .populate("assigned", "username fullName email phone role")
       .populate("technician_id", "username fullName email phone role")
       .populate(
         "service_type_id",
