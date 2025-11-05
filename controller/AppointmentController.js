@@ -120,10 +120,13 @@ exports.getAppointments = async (req, res) => {
       .populate("vehicle_id", "license_plate vin")
       .populate("staff_id", "username fullName email phone role")
       .populate("technician_id", "username fullName email phone role")
-      .populate("payment_id", "order_code amount status checkout_url qr_code")
+      .populate(
+        "payment_id",
+        "order_code orderCode amount status checkout_url checkoutUrl qr_code qrCode"
+      )
       .populate(
         "final_payment_id",
-        "order_code amount status checkout_url qr_code"
+        "orderCode amount status checkoutUrl qrCode"
       )
       .populate(
         "service_type_id",
@@ -412,10 +415,13 @@ exports.assignTechnician = async (req, res) => {
       .populate("vehicle_id", "license_plate brand model year")
       .populate("staff_id", "username fullName email phone role")
       .populate("technician_id", "username fullName email phone role")
-      .populate("payment_id", "order_code amount status checkout_url qr_code")
+      .populate(
+        "payment_id",
+        "order_code orderCode amount status checkout_url checkoutUrl qr_code qrCode"
+      )
       .populate(
         "final_payment_id",
-        "order_code amount status checkout_url qr_code"
+        "orderCode amount status checkoutUrl qrCode"
       )
       .populate(
         "service_type_id",
@@ -469,10 +475,13 @@ exports.getMyAppointments = async (req, res) => {
       .populate("vehicle_id", "license_plate brand model year")
       .populate("staff_id", "username fullName email phone role")
       .populate("technician_id", "username fullName email phone role")
-      .populate("payment_id", "order_code amount status checkout_url qr_code")
+      .populate(
+        "payment_id",
+        "order_code orderCode amount status checkout_url checkoutUrl qr_code qrCode"
+      )
       .populate(
         "final_payment_id",
-        "order_code amount status checkout_url qr_code"
+        "orderCode amount status checkoutUrl qrCode"
       )
       .populate(
         "service_type_id",
@@ -620,10 +629,13 @@ exports.getAppointmentById = async (req, res) => {
       .populate("vehicle_id", "license_plate brand model year color")
       .populate("staff_id", "username fullName email phone role")
       .populate("technician_id", "username fullName email phone role")
-      .populate("payment_id", "order_code amount status checkout_url qr_code")
+      .populate(
+        "payment_id",
+        "order_code orderCode amount status checkout_url checkoutUrl qr_code qrCode"
+      )
       .populate(
         "final_payment_id",
-        "order_code amount status checkout_url qr_code"
+        "orderCode amount status checkoutUrl qrCode"
       )
       .populate(
         "service_type_id",
@@ -694,10 +706,13 @@ exports.getAppointmentsByUsername = async (req, res) => {
       .populate("vehicle_id", "license_plate brand model year")
       .populate("staff_id", "username fullName email phone role")
       .populate("technician_id", "username fullName email phone role")
-      .populate("payment_id", "order_code amount status checkout_url qr_code")
+      .populate(
+        "payment_id",
+        "order_code orderCode amount status checkout_url checkoutUrl qr_code qrCode"
+      )
       .populate(
         "final_payment_id",
-        "order_code amount status checkout_url qr_code"
+        "orderCode amount status checkoutUrl qrCode"
       )
       .sort({ appoinment_date: -1 })
       .skip(pagination.skip)
@@ -768,10 +783,13 @@ exports.getAppointmentsByTechnician = async (req, res) => {
       .populate("vehicle_id", "license_plate brand model year")
       .populate("staff_id", "username fullName email phone role")
       .populate("technician_id", "username fullName email phone role")
-      .populate("payment_id", "order_code amount status checkout_url qr_code")
+      .populate(
+        "payment_id",
+        "order_code orderCode amount status checkout_url checkoutUrl qr_code qrCode"
+      )
       .populate(
         "final_payment_id",
-        "order_code amount status checkout_url qr_code"
+        "orderCode amount status checkoutUrl qrCode"
       )
       .sort({ appoinment_date: -1 })
       .skip(pagination.skip)
@@ -952,10 +970,13 @@ exports.createFinalPayment = async (req, res) => {
         .populate("center_id", "name address phone")
         .populate("vehicle_id", "license_plate brand model year")
 
-        .populate("payment_id", "order_code amount status checkout_url qr_code")
+        .populate(
+          "payment_id",
+          "order_code orderCode amount status checkout_url checkoutUrl qr_code qrCode"
+        )
         .populate(
           "final_payment_id",
-          "order_code amount status checkout_url qr_code"
+          "orderCode amount status checkoutUrl qrCode"
         );
 
       return res.status(200).json({
@@ -1244,26 +1265,6 @@ exports.createDepositPayment = async (userId, appointmentId) => {
 
   try {
     await PaymentController.createPaymentLink(paymentReq, paymentRes);
-    // Nếu controller trả về mã khác 201, paymentResult sẽ vẫn là null => tạo fallback
-    if (!paymentResult || paymentResult.success !== true) {
-      const orderCode = Date.now();
-      const fallback = new Payment({
-        orderCode: orderCode,
-        amount: depositAmount,
-        description,
-        status: "PENDING",
-        user_id: userId,
-      });
-      await fallback.save();
-      paymentResult = {
-        success: true,
-        data: {
-          payment_id: fallback._id,
-          orderCode: orderCode,
-          amount: depositAmount,
-        },
-      };
-    }
   } catch {
     const orderCode = Date.now();
     const fallback = new Payment({
@@ -1505,7 +1506,10 @@ exports.createAppointment = async (req, res) => {
       .populate("vehicle_id", "license_plate vin")
       .populate("technician_id", "username fullName email phone role")
       .populate("service_type_id", "service_name description base_price estimated_duration")
-      .populate("payment_id", "order_code amount status checkout_url qr_code")
+      .populate(
+        "payment_id",
+        "order_code orderCode amount status checkout_url checkoutUrl qr_code qrCode"
+      )
       .lean();
 
     return res.status(201).json({
