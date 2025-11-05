@@ -66,6 +66,40 @@ router.post(
 
 
 
+
+
+/**
+ * @swagger
+ * /api/service-center/technicians:
+ *   get:
+ *     summary: Lấy danh sách technicians (có thể filter theo center_id)
+ *     tags: [Service Center]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: center_id
+ *         required: false
+ *         schema:
+ *           type: string
+ *         description: ID của Service Center để lọc technicians
+ *     responses:
+ *       200:
+ *         description: Lấy danh sách technician thành công
+ *       401:
+ *         description: Không có quyền truy cập
+ *       404:
+ *         description: Không tìm thấy trung tâm (khi truyền center_id không hợp lệ)
+ *       500:
+ *         description: Lỗi server
+ */
+router.get(
+  "/technicians",
+  auth.authMiddleWare,
+  auth.requireRole("customer", "staff", "technician", "admin"),
+  serviceCenterHours.getTechnicians
+);
+
 /**
  * @swagger
  * /api/service-center/get:
@@ -81,6 +115,11 @@ router.post(
  *           type: integer
  *           default: 4
  *         description: Số tuần muốn lấy (mặc định 4 tuần). Chỉ dùng khi không có start_date và end_date
+ *       - in: query
+ *         name: center_id
+ *         schema:
+ *           type: string
+ *         description: Lọc theo ID trung tâm. Khi truyền vào, response của mỗi trung tâm sẽ kèm danh sách technicians
  *       - in: query
  *         name: start_date
  *         schema:

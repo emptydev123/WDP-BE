@@ -4,6 +4,55 @@ const Appointment = require('../model/appointment');
 const Technican = require('../model/technican');
 const { getDayOfWeek } = require('../utils/logicSlots');
 const { getWeekDates } = require('../utils/timeUtils');
+
+
+
+/**
+ * Lấy danh sách technicians, có thể filter theo center_id (query)
+ * - Nếu có center_id: trả về technicians của trung tâm đó
+ * - Nếu không: trả về tất cả technicians đang bật (status=on)
+ */
+exports.getTechnicians = async (req, res) => {
+    try {
+        const userId = req._id?.toString();
+        if (!userId) {
+            return res.status(401).json({ success: false, message: 'Unauthorized' });
+        }
+
+        const { center_id } = req.query;
+
+        if (center_id) {
+            // Validate center exists
+            const center = await ServiceCenter.findOne({ _id: center_id, is_active: true }).lean();
+            if (!center) {
+                return res.status(404).json({ success: false, message: 'Không tìm thấy trung tâm' });
+            }
+        }
+
+        const query = { status: 'on' };
+        if (center_id) query.center_id = center_id;
+
+        const technicians = await Technican.find(query)
+            .populate('user_id', 'username fullName email phone avatar')
+            .lean();
+
+        return res.status(200).json({
+            success: true,
+            message: 'Lấy danh sách technician thành công',
+            data: technicians.map((t) => ({
+                _id: t._id,
+                user: t.user_id,
+                center_id: t.center_id,
+                status: t.status,
+                createdAt: t.createdAt,
+                updatedAt: t.updatedAt,
+            })),
+        });
+    } catch (error) {
+        console.error('Error getting technicians:', error);
+        return res.status(500).json({ success: false, message: 'Lỗi server', error: error.message });
+    }
+};
 exports.createServiceCenterHours = async (center_id) => {
     try {
         // Giả sử trung tâm đã được tạo, giờ tạo giờ làm việc cho mỗi ngày
@@ -71,6 +120,17 @@ exports.getAllServiceCentersWithHours = async (req, res) => {
             });
         }
 
+        // Kiểm tra filter theo center_id (optional) và có start_date/end_date không
+        const filterCenterId = req.query.center_id || null;
+
+        // Validate center khi có filter
+        if (filterCenterId) {
+            const exists = await ServiceCenter.findOne({ _id: filterCenterId, is_active: true }).lean();
+            if (!exists) {
+                return res.status(404).json({ success: false, message: "Không tìm thấy trung tâm" });
+            }
+        }
+
         // Kiểm tra xem có start_date và end_date không
         const hasDateRange = req.query.start_date && req.query.end_date;
         let weeks = 4;
@@ -91,8 +151,10 @@ exports.getAllServiceCentersWithHours = async (req, res) => {
             weeks = parseInt(req.query.weeks) || 4;
         }
 
-        // Lấy tất cả các trung tâm (chỉ active centers)
-        const serviceCenters = await ServiceCenter.find({ is_active: true })
+        // Lấy tất cả các trung tâm (chỉ active centers), có thể filter theo center_id
+        const centerQuery = { is_active: true };
+        if (filterCenterId) centerQuery._id = filterCenterId;
+        const serviceCenters = await ServiceCenter.find(centerQuery)
             .populate("user_id", "username fullName email phone")
             .lean();
 
@@ -123,6 +185,11 @@ exports.getAllServiceCentersWithHours = async (req, res) => {
             serviceCenters.map(async (center) => {
                 const centerId = center._id.toString();
                 const hoursTemplate = hoursTemplateByCenter[centerId] || {};
+                // Lấy technicians để tính sức chứa đồng thời theo khung giờ
+                const technicians = await Technican.find({ center_id: centerId, status: 'on' })
+                    .populate('user_id', 'username fullName email phone avatar')
+                    .lean();
+                const techCount = technicians.length;
 
                 let weeksData = [];
 
@@ -195,6 +262,7 @@ exports.getAllServiceCentersWithHours = async (req, res) => {
                             open_time: template.open_time || null,
                             close_time: template.close_time || null,
                             is_close: template.is_close || false,
+                            isBooked: bookedSlots > 0,
                             totalSlots: totalSlots,
                             bookedSlots: bookedSlots,
                             remainingSlots: remainingSlots,
@@ -215,7 +283,28 @@ exports.getAllServiceCentersWithHours = async (req, res) => {
                                 week_number: index + 1,
                                 week_start: actualStart,
                                 week_end: actualEnd,
-                                days: week.days.sort((a, b) => a.date.localeCompare(b.date)),
+                                days: week.days
+                                    .sort((a, b) => a.date.localeCompare(b.date))
+                                    .map((d) => {
+                                        // Thêm thống kê theo từng khung giờ trong ngày
+                                        const dayAppointments = appointmentsByDate[d.date] || [];
+                                        const byTime = {};
+                                        dayAppointments.forEach((apt) => {
+                                            if (!apt.appoinment_time) return;
+                                            const t = String(apt.appoinment_time).slice(0, 5);
+                                            byTime[t] = (byTime[t] || 0) + 1;
+                                        });
+                                        const timeSlots = Object.keys(byTime)
+                                            .sort()
+                                            .map((t) => {
+                                                const count = byTime[t];
+                                                const capacity = techCount;
+                                                const isFull = capacity <= 0 ? true : count >= capacity;
+                                                const available = Math.max(0, capacity - count);
+                                                return { time: t, bookedCount: count, isFull, available, isBooked: isFull };
+                                            });
+                                        return { ...d, timeSlots };
+                                    }),
                             };
                         })
                         .sort((a, b) => a.week_start.localeCompare(b.week_start));
@@ -267,16 +356,36 @@ exports.getAllServiceCentersWithHours = async (req, res) => {
                             const totalSlots = template.totalSlots || 0;
                             const remainingSlots = Math.max(0, totalSlots - bookedSlots);
 
+                            // Nhóm theo khung giờ
+                            const dayAppointments = appointmentsByDate[dateStr] || [];
+                            const byTime = {};
+                            dayAppointments.forEach((apt) => {
+                                if (!apt.appoinment_time) return;
+                                const t = String(apt.appoinment_time).slice(0, 5);
+                                byTime[t] = (byTime[t] || 0) + 1;
+                            });
+                            const timeSlots = Object.keys(byTime)
+                                .sort()
+                                .map((t) => {
+                                    const count = byTime[t];
+                                    const capacity = techCount;
+                                    const isFull = capacity <= 0 ? true : count >= capacity;
+                                    const available = Math.max(0, capacity - count);
+                                    return { time: t, bookedCount: count, isFull, available, isBooked: isFull };
+                                });
+
                             return {
                                 date: dateStr,
                                 day_of_week: dayOfWeek,
                                 open_time: template.open_time || null,
                                 close_time: template.close_time || null,
                                 is_close: template.is_close || false,
+                                isBooked: bookedSlots > 0,
                                 totalSlots: totalSlots,
                                 bookedSlots: bookedSlots,
                                 remainingSlots: remainingSlots,
                                 availableSlots: remainingSlots,
+                                timeSlots: timeSlots,
                             };
                         });
 
@@ -291,6 +400,14 @@ exports.getAllServiceCentersWithHours = async (req, res) => {
 
                 return {
                     ...center,
+                    technicians: technicians.map(t => ({
+                        _id: t._id,
+                        user: t.user_id,
+                        center_id: t.center_id,
+                        status: t.status,
+                        createdAt: t.createdAt,
+                        updatedAt: t.updatedAt,
+                    })),
                     weeks: weeksData,
                 };
             })
