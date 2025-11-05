@@ -924,10 +924,10 @@ exports.createFinalPayment = async (req, res) => {
     } catch (paymentError) {
       const orderCode = Date.now();
       const fallbackPayment = new Payment({
-        order_code: orderCode,
+        orderCode: orderCode,
         amount: remainingAmount,
         description: finalPaymentDescription,
-        status: "pending",
+        status: "PENDING",
         user_id: appointment.user_id._id,
       });
 
@@ -936,9 +936,9 @@ exports.createFinalPayment = async (req, res) => {
         success: true,
         data: {
           payment_id: fallbackPayment._id,
-          order_code: orderCode,
+          orderCode: orderCode,
           amount: remainingAmount,
-          status: "pending",
+          status: "PENDING",
         },
       };
     }
@@ -1244,13 +1244,33 @@ exports.createDepositPayment = async (userId, appointmentId) => {
 
   try {
     await PaymentController.createPaymentLink(paymentReq, paymentRes);
+    // Nếu controller trả về mã khác 201, paymentResult sẽ vẫn là null => tạo fallback
+    if (!paymentResult || paymentResult.success !== true) {
+      const orderCode = Date.now();
+      const fallback = new Payment({
+        orderCode: orderCode,
+        amount: depositAmount,
+        description,
+        status: "PENDING",
+        user_id: userId,
+      });
+      await fallback.save();
+      paymentResult = {
+        success: true,
+        data: {
+          payment_id: fallback._id,
+          orderCode: orderCode,
+          amount: depositAmount,
+        },
+      };
+    }
   } catch {
     const orderCode = Date.now();
     const fallback = new Payment({
-      order_code: orderCode,
+      orderCode: orderCode,
       amount: depositAmount,
       description,
-      status: "pending",
+      status: "PENDING",
       user_id: userId,
     });
     await fallback.save();
@@ -1258,7 +1278,7 @@ exports.createDepositPayment = async (userId, appointmentId) => {
       success: true,
       data: {
         payment_id: fallback._id,
-        order_code: orderCode,
+        orderCode: orderCode,
         amount: depositAmount,
       },
     };
