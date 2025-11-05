@@ -119,3 +119,26 @@ exports.isPastDate = (date) => {
   return checkDate < today;
 };
 
+exports.getWeekDates = (startDate, weekIndex) => {
+  const dates = [];
+
+  // Tìm thứ 2 của tuần hiện tại (từ startDate)
+  const currentDay = startDate.getDay(); // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
+  const daysToMonday = currentDay === 0 ? -6 : 1 - currentDay; // Số ngày cần trừ để về thứ 2
+
+  const mondayOfCurrentWeek = new Date(startDate);
+  mondayOfCurrentWeek.setDate(startDate.getDate() + daysToMonday);
+  mondayOfCurrentWeek.setHours(0, 0, 0, 0);
+
+  // Tính thứ 2 của tuần thứ weekIndex (0 = tuần hiện tại, 1 = tuần sau, ...)
+  const mondayOfTargetWeek = new Date(mondayOfCurrentWeek);
+  mondayOfTargetWeek.setDate(mondayOfCurrentWeek.getDate() + (weekIndex * 7));
+
+  // Lấy 5 ngày làm việc (Monday-Friday)
+  for (let i = 0; i < 5; i++) {
+    const date = new Date(mondayOfTargetWeek);
+    date.setDate(mondayOfTargetWeek.getDate() + i);
+    dates.push(date);
+  }
+  return dates;
+}

@@ -66,17 +66,75 @@ router.post(
 
 
 
+
+
+/**
+ * @swagger
+ * /api/service-center/technicians:
+ *   get:
+ *     summary: Lấy danh sách technicians (có thể filter theo center_id)
+ *     tags: [Service Center]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: center_id
+ *         required: false
+ *         schema:
+ *           type: string
+ *         description: ID của Service Center để lọc technicians
+ *     responses:
+ *       200:
+ *         description: Lấy danh sách technician thành công
+ *       401:
+ *         description: Không có quyền truy cập
+ *       404:
+ *         description: Không tìm thấy trung tâm (khi truyền center_id không hợp lệ)
+ *       500:
+ *         description: Lỗi server
+ */
+router.get(
+  "/technicians",
+  auth.authMiddleWare,
+  auth.requireRole("customer", "staff", "technician", "admin"),
+  serviceCenterHours.getTechnicians
+);
+
 /**
  * @swagger
  * /api/service-center/get:
  *   get:
- *     summary: Lấy danh sách tất cả trung tâm và giờ làm việc
+ *     summary: Lấy danh sách tất cả trung tâm và giờ làm việc theo từng tuần hoặc theo khoảng ngày
  *     tags: [Service Center]
  *     security:
  *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: weeks
+ *         schema:
+ *           type: integer
+ *           default: 4
+ *         description: Số tuần muốn lấy (mặc định 4 tuần). Chỉ dùng khi không có start_date và end_date
+ *       - in: query
+ *         name: center_id
+ *         schema:
+ *           type: string
+ *         description: Lọc theo ID trung tâm. Khi truyền vào, response của mỗi trung tâm sẽ kèm danh sách technicians
+ *       - in: query
+ *         name: start_date
+ *         schema:
+ *           type: string
+ *           format: date
+ *         description: Ngày bắt đầu (YYYY-MM-DD). Phải đi kèm với end_date. Nếu là T7/CN vẫn hiển thị nhưng chỉ có 2 ngày đó
+ *       - in: query
+ *         name: end_date
+ *         schema:
+ *           type: string
+ *           format: date
+ *         description: Ngày kết thúc (YYYY-MM-DD). Phải đi kèm với start_date. Nếu là T7/CN vẫn hiển thị nhưng chỉ có 2 ngày đó
  *     responses:
  *       200:
- *         description: Lấy danh sách trung tâm và giờ làm việc thành công
+ *         description: Lấy danh sách trung tâm và giờ làm việc thành công theo từng tuần
  *         content:
  *           application/json:
  *             schema:
@@ -87,7 +145,7 @@ router.post(
  *                   example: true
  *                 message:
  *                   type: string
- *                   example: "Lấy danh sách trung tâm và giờ làm việc thành công"
+ *                   example: "Lấy danh sách trung tâm và giờ làm việc thành công (4 tuần)"
  *                 data:
  *                   type: array
  *                   items:
@@ -114,37 +172,64 @@ router.post(
  *                       slots:
  *                         type: number
  *                         example: 16
- *                       working_hours:
+ *                       weeks:
  *                         type: array
+ *                         description: Danh sách các tuần
  *                         items:
  *                           type: object
  *                           properties:
- *                             _id:
- *                               type: string
- *                             day_of_week:
- *                               type: string
- *                               example: "Monday"
- *                             open_time:
- *                               type: string
- *                               example: "08:00"
- *                             close_time:
- *                               type: string
- *                               example: "17:00"
- *                             is_close:
- *                               type: boolean
- *                               example: false
- *                             availableSlots:
+ *                             week_number:
  *                               type: number
- *                               example: 16
- *                             totalSlots:
- *                               type: number
- *                               example: 16
- *                             remainingSlots:
- *                               type: number
- *                               example: 12
- *                             isBooked:
- *                               type: boolean
- *                               example: true
+ *                               example: 1
+ *                               description: Số thứ tự tuần (1, 2, 3, 4...)
+ *                             week_start:
+ *                               type: string
+ *                               format: date
+ *                               example: "2025-11-03"
+ *                               description: Ngày bắt đầu tuần (Monday)
+ *                             week_end:
+ *                               type: string
+ *                               format: date
+ *                               example: "2025-11-07"
+ *                               description: Ngày kết thúc tuần (Friday)
+ *                             days:
+ *                               type: array
+ *                               description: Danh sách các ngày trong tuần (Monday-Friday)
+ *                               items:
+ *                                 type: object
+ *                                 properties:
+ *                                   date:
+ *                                     type: string
+ *                                     format: date
+ *                                     example: "2025-11-03"
+ *                                   day_of_week:
+ *                                     type: string
+ *                                     example: "Monday"
+ *                                   open_time:
+ *                                     type: string
+ *                                     example: "08:00"
+ *                                   close_time:
+ *                                     type: string
+ *                                     example: "17:00"
+ *                                   is_close:
+ *                                     type: boolean
+ *                                     example: false
+ *                                   totalSlots:
+ *                                     type: number
+ *                                     example: 16
+ *                                     description: Tổng số slot của ngày này
+ *                                   bookedSlots:
+ *                                     type: number
+ *                                     example: 4
+ *                                     description: Số slot đã được đặt trong ngày này
+ *                                   remainingSlots:
+ *                                     type: number
+ *                                     example: 12
+ *                                     description: Số slot còn lại
+ *                                   availableSlots:
+ *                                     type: number
+ *                                     example: 12
+ *                                     description: Số slot khả dụng (giống remainingSlots)
  *       401:
  *         description: Unauthorized
  *       500:
