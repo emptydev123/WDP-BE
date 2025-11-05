@@ -951,8 +951,7 @@ exports.createFinalPayment = async (req, res) => {
         .populate("user_id", "username fullName email phone")
         .populate("center_id", "name address phone")
         .populate("vehicle_id", "license_plate brand model year")
-        .populate("assigned_by", "username fullName email phone role")
-        .populate("assigned", "username fullName email phone role")
+
         .populate("payment_id", "order_code amount status checkout_url qr_code")
         .populate(
           "final_payment_id",
@@ -1109,12 +1108,8 @@ exports.autoAssignTechnician = async ({
       }
 
       // 1. Kiểm tra technician đã đủ 4 slot trong ngày chưa
-      // Check cả assigned và technician_id để đảm bảo không bỏ sót
       const appointmentsInDay = await Appointment.countDocuments({
-        $or: [
-          { assigned: techUserId },
-          { technician_id: techUserId }
-        ],
+        technician_id: techUserId,
         appoinment_date: {
           $gte: appointmentDate,
           $lte: appointmentDateEnd,
@@ -1131,10 +1126,7 @@ exports.autoAssignTechnician = async ({
 
       // 2. Kiểm tra technician có bận vào thời gian này không
       const conflictingAppointments = await Appointment.find({
-        $or: [
-          { assigned: techUserId },
-          { technician_id: techUserId }
-        ],
+        technician_id: techUserId,
         appoinment_date: {
           $gte: appointmentDate,
           $lte: appointmentDateEnd,
@@ -1371,10 +1363,7 @@ exports.createAppointment = async (req, res) => {
       appointmentDateEnd.setHours(23, 59, 59, 999);
 
       const appointmentsInDay = await Appointment.countDocuments({
-        $or: [
-          { assigned: technician_id },
-          { technician_id: technician_id }
-        ],
+        technician_id: technician_id,
         appoinment_date: {
           $gte: appointmentDate,
           $lte: appointmentDateEnd,
@@ -1393,10 +1382,7 @@ exports.createAppointment = async (req, res) => {
 
       // Kiểm tra conflict thời gian
       const conflictingAppointments = await Appointment.find({
-        $or: [
-          { assigned: technician_id },
-          { technician_id: technician_id }
-        ],
+        technician_id: technician_id,
         appoinment_date: {
           $gte: appointmentDate,
           $lte: appointmentDateEnd,
@@ -1481,7 +1467,6 @@ exports.createAppointment = async (req, res) => {
       service_type_id,
       status: "pending",
       technician_id: selectedTechnician,
-      assigned: selectedTechnician, // Cũng set vào assigned field
     });
 
     await appointment.save();
@@ -1498,7 +1483,6 @@ exports.createAppointment = async (req, res) => {
       .populate("user_id", "username fullName email phone")
       .populate("center_id", "center_name address phone")
       .populate("vehicle_id", "license_plate vin")
-      .populate("assigned", "username fullName email phone role")
       .populate("technician_id", "username fullName email phone role")
       .populate("service_type_id", "service_name description base_price estimated_duration")
       .populate("payment_id", "order_code amount status checkout_url qr_code")

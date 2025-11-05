@@ -55,11 +55,7 @@ const appointmentSchema = new schema(
       ref: "User",
       required: false,
     },
-    technician_id: {
-      type: mongoose.Types.ObjectId,
-      ref: "User",
-      required: false,
-    },
+    // technician_id will be defined below with default
     payment_id: {
       type: mongoose.Types.ObjectId,
       ref: "Payment",
@@ -76,6 +72,18 @@ const appointmentSchema = new schema(
       required: false,
     },
     technician_id: {
+      type: mongoose.Types.ObjectId,
+      ref: "User",
+      required: false,
+      default: null,
+    },
+    assigned: {
+      type: mongoose.Types.ObjectId,
+      ref: "User",
+      required: false,
+      default: null,
+    },
+    assigned_by: {
       type: mongoose.Types.ObjectId,
       ref: "User",
       required: false,
