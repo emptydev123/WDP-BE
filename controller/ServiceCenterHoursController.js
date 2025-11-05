@@ -41,7 +41,24 @@ exports.getServiceCenterHours = async (center_id) => {
 
 
 /**
- * Lấy lịch làm việc của tất cả các trung tâm theo từng tuần
+ * Lấy tất cả các ngày trong khoảng startDate đến endDate
+ */
+const getDatesInRange = (startDate, endDate) => {
+    const dates = [];
+    const currentDate = new Date(startDate);
+    currentDate.setHours(0, 0, 0, 0);
+    const end = new Date(endDate);
+    end.setHours(23, 59, 59, 999);
+
+    while (currentDate <= end) {
+        dates.push(new Date(currentDate));
+        currentDate.setDate(currentDate.getDate() + 1);
+    }
+    return dates;
+};
+
+/**
+ * Lấy lịch làm việc của tất cả các trung tâm theo từng tuần hoặc theo khoảng ngày
  */
 exports.getAllServiceCentersWithHours = async (req, res) => {
     try {
@@ -54,10 +71,25 @@ exports.getAllServiceCentersWithHours = async (req, res) => {
             });
         }
 
-        // Lấy số tuần muốn hiển thị (mặc định 4 tuần)
-        const weeks = parseInt(req.query.weeks) || 4;
-        const startDate = req.query.start_date ? new Date(req.query.start_date) : new Date();
+        // Kiểm tra xem có start_date và end_date không
+        const hasDateRange = req.query.start_date && req.query.end_date;
+        let weeks = 4;
+        let startDate = new Date();
         startDate.setHours(0, 0, 0, 0);
+        let endDate = null;
+        let dateRange = [];
+
+        if (hasDateRange) {
+            // Nếu có start_date và end_date, chỉ gen ra các ngày trong khoảng đó
+            startDate = new Date(req.query.start_date);
+            startDate.setHours(0, 0, 0, 0);
+            endDate = new Date(req.query.end_date);
+            endDate.setHours(23, 59, 59, 999);
+            dateRange = getDatesInRange(startDate, endDate);
+        } else {
+            // Nếu không có, dùng logic cũ (4 tuần)
+            weeks = parseInt(req.query.weeks) || 4;
+        }
 
         // Lấy tất cả các trung tâm (chỉ active centers)
         const serviceCenters = await ServiceCenter.find({ is_active: true })
@@ -68,7 +100,6 @@ exports.getAllServiceCentersWithHours = async (req, res) => {
         const allHours = await ServiceCenterHours.find().lean();
 
         // Nhóm giờ làm việc template theo center_id
-        const daysOrder = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
         const hoursTemplateByCenter = {};
 
         allHours.forEach((hour) => {
@@ -79,31 +110,35 @@ exports.getAllServiceCentersWithHours = async (req, res) => {
             hoursTemplateByCenter[centerId][hour.day_of_week] = hour;
         });
 
+        // Helper function để format date
+        const formatDate = (date) => {
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        };
+
         // Xử lý từng trung tâm
         const result = await Promise.all(
             serviceCenters.map(async (center) => {
                 const centerId = center._id.toString();
                 const hoursTemplate = hoursTemplateByCenter[centerId] || {};
 
-                // Tạo dữ liệu cho từng tuần
-                const weeksData = [];
+                let weeksData = [];
 
-                for (let weekIndex = 0; weekIndex < weeks; weekIndex++) {
-                    const weekDates = getWeekDates(startDate, weekIndex);
-                    const weekStart = weekDates[0];
-                    const weekEnd = weekDates[weekDates.length - 1];
+                if (hasDateRange) {
+                    // Trường hợp có start_date và end_date
+                    // Lấy tất cả appointments trong khoảng ngày
+                    const rangeStartQuery = new Date(startDate);
+                    rangeStartQuery.setHours(0, 0, 0, 0);
+                    const rangeEndQuery = new Date(endDate);
+                    rangeEndQuery.setHours(23, 59, 59, 999);
 
-                    // Lấy tất cả appointments trong tuần này
-                    const weekStartQuery = new Date(weekStart);
-                    weekStartQuery.setHours(0, 0, 0, 0);
-                    const weekEndQuery = new Date(weekEnd);
-                    weekEndQuery.setHours(23, 59, 59, 999);
-
-                    const weekAppointments = await Appointment.find({
+                    const rangeAppointments = await Appointment.find({
                         center_id: centerId,
                         appoinment_date: {
-                            $gte: weekStartQuery,
-                            $lte: weekEndQuery,
+                            $gte: rangeStartQuery,
+                            $lte: rangeEndQuery,
                         },
                         status: {
                             $nin: ["canceled", "completed", "paid"],
@@ -112,13 +147,10 @@ exports.getAllServiceCentersWithHours = async (req, res) => {
 
                     // Nhóm appointments theo ngày (format YYYY-MM-DD)
                     const appointmentsByDate = {};
-                    weekAppointments.forEach((apt) => {
+                    rangeAppointments.forEach((apt) => {
                         const aptDate = new Date(apt.appoinment_date);
                         aptDate.setHours(0, 0, 0, 0);
-                        const year = aptDate.getFullYear();
-                        const month = String(aptDate.getMonth() + 1).padStart(2, '0');
-                        const day = String(aptDate.getDate()).padStart(2, '0');
-                        const dateStr = `${year}-${month}-${day}`;
+                        const dateStr = formatDate(aptDate);
 
                         if (!appointmentsByDate[dateStr]) {
                             appointmentsByDate[dateStr] = [];
@@ -126,23 +158,40 @@ exports.getAllServiceCentersWithHours = async (req, res) => {
                         appointmentsByDate[dateStr].push(apt);
                     });
 
-                    // Tạo dữ liệu cho từng ngày trong tuần
-                    const daysData = weekDates.map((date) => {
-                        const dayOfWeek = getDayOfWeek(date);
-                        const year = date.getFullYear();
-                        const month = String(date.getMonth() + 1).padStart(2, '0');
-                        const day = String(date.getDate()).padStart(2, '0');
-                        const dateStr = `${year}-${month}-${day}`;
-                        const template = hoursTemplate[dayOfWeek] || {};
+                    // Nhóm các ngày theo tuần (từ thứ 2 đến chủ nhật)
+                    const weeksMap = {};
 
-                        // Tính số slot đã được đặt trong ngày này
+                    // Tạo dữ liệu cho từng ngày và nhóm vào tuần tương ứng
+                    dateRange.forEach((date) => {
+                        const dayOfWeek = date.getDay(); // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
+                        const daysToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+                        const mondayOfWeek = new Date(date);
+                        mondayOfWeek.setDate(date.getDate() + daysToMonday);
+                        mondayOfWeek.setHours(0, 0, 0, 0);
+                        const weekKey = formatDate(mondayOfWeek);
+
+                        // Khởi tạo tuần nếu chưa có
+                        if (!weeksMap[weekKey]) {
+                            const sundayOfWeek = new Date(mondayOfWeek);
+                            sundayOfWeek.setDate(mondayOfWeek.getDate() + 6);
+                            weeksMap[weekKey] = {
+                                week_start: formatDate(mondayOfWeek),
+                                week_end: formatDate(sundayOfWeek),
+                                days: [],
+                            };
+                        }
+
+                        // Tạo dữ liệu cho ngày này
+                        const dayOfWeekName = getDayOfWeek(date);
+                        const dateStr = formatDate(date);
+                        const template = hoursTemplate[dayOfWeekName] || {};
                         const bookedSlots = appointmentsByDate[dateStr]?.length || 0;
                         const totalSlots = template.totalSlots || 0;
                         const remainingSlots = Math.max(0, totalSlots - bookedSlots);
 
-                        return {
+                        weeksMap[weekKey].days.push({
                             date: dateStr,
-                            day_of_week: dayOfWeek,
+                            day_of_week: dayOfWeekName,
                             open_time: template.open_time || null,
                             close_time: template.close_time || null,
                             is_close: template.is_close || false,
@@ -150,23 +199,94 @@ exports.getAllServiceCentersWithHours = async (req, res) => {
                             bookedSlots: bookedSlots,
                             remainingSlots: remainingSlots,
                             availableSlots: remainingSlots,
-                        };
+                        });
                     });
 
-                    // Format date cho week_start và week_end
-                    const formatDate = (date) => {
-                        const year = date.getFullYear();
-                        const month = String(date.getMonth() + 1).padStart(2, '0');
-                        const day = String(date.getDate()).padStart(2, '0');
-                        return `${year}-${month}-${day}`;
-                    };
+                    // Convert weeksMap thành array và sắp xếp theo week_start
+                    // Sửa week_start và week_end để phản ánh đúng khoảng ngày thực tế (không phải cả tuần)
+                    weeksData = Object.values(weeksMap)
+                        .map((week, index) => {
+                            // Sắp xếp days theo date để tìm ngày đầu và ngày cuối
+                            const sortedDays = [...week.days].sort((a, b) => a.date.localeCompare(b.date));
+                            const actualStart = sortedDays[0]?.date || week.week_start;
+                            const actualEnd = sortedDays[sortedDays.length - 1]?.date || week.week_end;
 
-                    weeksData.push({
-                        week_number: weekIndex + 1,
-                        week_start: formatDate(weekStart),
-                        week_end: formatDate(weekEnd),
-                        days: daysData,
-                    });
+                            return {
+                                week_number: index + 1,
+                                week_start: actualStart,
+                                week_end: actualEnd,
+                                days: week.days.sort((a, b) => a.date.localeCompare(b.date)),
+                            };
+                        })
+                        .sort((a, b) => a.week_start.localeCompare(b.week_start));
+                } else {
+                    // Trường hợp không có start_date và end_date (logic cũ)
+                    for (let weekIndex = 0; weekIndex < weeks; weekIndex++) {
+                        const weekDates = getWeekDates(startDate, weekIndex);
+                        const weekStart = weekDates[0];
+                        const weekEnd = weekDates[weekDates.length - 1];
+
+                        // Lấy tất cả appointments trong tuần này
+                        const weekStartQuery = new Date(weekStart);
+                        weekStartQuery.setHours(0, 0, 0, 0);
+                        const weekEndQuery = new Date(weekEnd);
+                        weekEndQuery.setHours(23, 59, 59, 999);
+
+                        const weekAppointments = await Appointment.find({
+                            center_id: centerId,
+                            appoinment_date: {
+                                $gte: weekStartQuery,
+                                $lte: weekEndQuery,
+                            },
+                            status: {
+                                $nin: ["canceled", "completed", "paid"],
+                            },
+                        }).lean();
+
+                        // Nhóm appointments theo ngày (format YYYY-MM-DD)
+                        const appointmentsByDate = {};
+                        weekAppointments.forEach((apt) => {
+                            const aptDate = new Date(apt.appoinment_date);
+                            aptDate.setHours(0, 0, 0, 0);
+                            const dateStr = formatDate(aptDate);
+
+                            if (!appointmentsByDate[dateStr]) {
+                                appointmentsByDate[dateStr] = [];
+                            }
+                            appointmentsByDate[dateStr].push(apt);
+                        });
+
+                        // Tạo dữ liệu cho từng ngày trong tuần
+                        const daysData = weekDates.map((date) => {
+                            const dayOfWeek = getDayOfWeek(date);
+                            const dateStr = formatDate(date);
+                            const template = hoursTemplate[dayOfWeek] || {};
+
+                            // Tính số slot đã được đặt trong ngày này
+                            const bookedSlots = appointmentsByDate[dateStr]?.length || 0;
+                            const totalSlots = template.totalSlots || 0;
+                            const remainingSlots = Math.max(0, totalSlots - bookedSlots);
+
+                            return {
+                                date: dateStr,
+                                day_of_week: dayOfWeek,
+                                open_time: template.open_time || null,
+                                close_time: template.close_time || null,
+                                is_close: template.is_close || false,
+                                totalSlots: totalSlots,
+                                bookedSlots: bookedSlots,
+                                remainingSlots: remainingSlots,
+                                availableSlots: remainingSlots,
+                            };
+                        });
+
+                        weeksData.push({
+                            week_number: weekIndex + 1,
+                            week_start: formatDate(weekStart),
+                            week_end: formatDate(weekEnd),
+                            days: daysData,
+                        });
+                    }
                 }
 
                 return {
@@ -176,9 +296,13 @@ exports.getAllServiceCentersWithHours = async (req, res) => {
             })
         );
 
+        const message = hasDateRange
+            ? `Lấy danh sách trung tâm và giờ làm việc thành công (từ ${formatDate(startDate)} đến ${formatDate(endDate)})`
+            : `Lấy danh sách trung tâm và giờ làm việc thành công (${weeks} tuần)`;
+
         return res.status(200).json({
             success: true,
-            message: `Lấy danh sách trung tâm và giờ làm việc thành công (${weeks} tuần)`,
+            message: message,
             data: result,
         });
     } catch (error) {

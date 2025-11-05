@@ -70,7 +70,7 @@ router.post(
  * @swagger
  * /api/service-center/get:
  *   get:
- *     summary: Lấy danh sách tất cả trung tâm và giờ làm việc theo từng tuần
+ *     summary: Lấy danh sách tất cả trung tâm và giờ làm việc theo từng tuần hoặc theo khoảng ngày
  *     tags: [Service Center]
  *     security:
  *       - bearerAuth: []
@@ -80,13 +80,19 @@ router.post(
  *         schema:
  *           type: integer
  *           default: 4
- *         description: Số tuần muốn lấy (mặc định 4 tuần)
+ *         description: Số tuần muốn lấy (mặc định 4 tuần). Chỉ dùng khi không có start_date và end_date
  *       - in: query
  *         name: start_date
  *         schema:
  *           type: string
  *           format: date
- *         description: Ngày bắt đầu (mặc định là hôm nay). Format YYYY-MM-DD
+ *         description: Ngày bắt đầu (YYYY-MM-DD). Phải đi kèm với end_date. Nếu là T7/CN vẫn hiển thị nhưng chỉ có 2 ngày đó
+ *       - in: query
+ *         name: end_date
+ *         schema:
+ *           type: string
+ *           format: date
+ *         description: Ngày kết thúc (YYYY-MM-DD). Phải đi kèm với start_date. Nếu là T7/CN vẫn hiển thị nhưng chỉ có 2 ngày đó
  *     responses:
  *       200:
  *         description: Lấy danh sách trung tâm và giờ làm việc thành công theo từng tuần
