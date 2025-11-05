@@ -1,6 +1,9 @@
 const ServiceCenterHours = require('../model/serviceCenterHours');
 const ServiceCenter = require('../model/serviceCenter');
-const Technican = require('../model/technican')
+const Appointment = require('../model/appointment');
+const Technican = require('../model/technican');
+const { getDayOfWeek } = require('../utils/logicSlots');
+const { getWeekDates } = require('../utils/timeUtils');
 exports.createServiceCenterHours = async (center_id) => {
     try {
         // Giả sử trung tâm đã được tạo, giờ tạo giờ làm việc cho mỗi ngày
@@ -36,8 +39,9 @@ exports.getServiceCenterHours = async (center_id) => {
     }
 };
 
+
 /**
- * Lấy lịch làm việc của tất cả các trung tâm
+ * Lấy lịch làm việc của tất cả các trung tâm theo từng tuần
  */
 exports.getAllServiceCentersWithHours = async (req, res) => {
     try {
@@ -50,57 +54,131 @@ exports.getAllServiceCentersWithHours = async (req, res) => {
             });
         }
 
+        // Lấy số tuần muốn hiển thị (mặc định 4 tuần)
+        const weeks = parseInt(req.query.weeks) || 4;
+        const startDate = req.query.start_date ? new Date(req.query.start_date) : new Date();
+        startDate.setHours(0, 0, 0, 0);
+
         // Lấy tất cả các trung tâm (chỉ active centers)
         const serviceCenters = await ServiceCenter.find({ is_active: true })
             .populate("user_id", "username fullName email phone")
             .lean();
 
-        // Lấy tất cả giờ làm việc
+        // Lấy tất cả giờ làm việc template (chỉ lấy thông tin cấu hình)
         const allHours = await ServiceCenterHours.find().lean();
 
-        // Nhóm giờ làm việc theo center_id và sắp xếp theo thứ trong tuần
-        const daysOrder = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
-        const hoursByCenter = {};
+        // Nhóm giờ làm việc template theo center_id
+        const daysOrder = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
+        const hoursTemplateByCenter = {};
 
         allHours.forEach((hour) => {
             const centerId = hour.center_id.toString();
-            if (!hoursByCenter[centerId]) {
-                hoursByCenter[centerId] = [];
+            if (!hoursTemplateByCenter[centerId]) {
+                hoursTemplateByCenter[centerId] = {};
             }
-            hoursByCenter[centerId].push(hour);
+            hoursTemplateByCenter[centerId][hour.day_of_week] = hour;
         });
 
-        // Sắp xếp giờ làm việc theo thứ trong tuần
-        Object.keys(hoursByCenter).forEach((centerId) => {
-            hoursByCenter[centerId].sort((a, b) => {
-                return daysOrder.indexOf(a.day_of_week) - daysOrder.indexOf(b.day_of_week);
-            });
-        });
+        // Xử lý từng trung tâm
+        const result = await Promise.all(
+            serviceCenters.map(async (center) => {
+                const centerId = center._id.toString();
+                const hoursTemplate = hoursTemplateByCenter[centerId] || {};
 
-        // Gộp thông tin trung tâm với giờ làm việc
-        const result = serviceCenters.map((center) => {
-            const centerId = center._id.toString();
-            const workingHours = hoursByCenter[centerId] || [];
+                // Tạo dữ liệu cho từng tuần
+                const weeksData = [];
 
-            return {
-                ...center,
-                working_hours: workingHours.map((hour) => ({
-                    _id: hour._id,
-                    day_of_week: hour.day_of_week,
-                    open_time: hour.open_time,
-                    close_time: hour.close_time,
-                    is_close: hour.is_close,
-                    availableSlots: hour.availableSlots,
-                    totalSlots: hour.totalSlots,
-                    remainingSlots: hour.remainingSlots,
-                    isBooked: hour.isBooked,
-                })),
-            };
-        });
+                for (let weekIndex = 0; weekIndex < weeks; weekIndex++) {
+                    const weekDates = getWeekDates(startDate, weekIndex);
+                    const weekStart = weekDates[0];
+                    const weekEnd = weekDates[weekDates.length - 1];
+
+                    // Lấy tất cả appointments trong tuần này
+                    const weekStartQuery = new Date(weekStart);
+                    weekStartQuery.setHours(0, 0, 0, 0);
+                    const weekEndQuery = new Date(weekEnd);
+                    weekEndQuery.setHours(23, 59, 59, 999);
+
+                    const weekAppointments = await Appointment.find({
+                        center_id: centerId,
+                        appoinment_date: {
+                            $gte: weekStartQuery,
+                            $lte: weekEndQuery,
+                        },
+                        status: {
+                            $nin: ["canceled", "completed", "paid"],
+                        },
+                    }).lean();
+
+                    // Nhóm appointments theo ngày (format YYYY-MM-DD)
+                    const appointmentsByDate = {};
+                    weekAppointments.forEach((apt) => {
+                        const aptDate = new Date(apt.appoinment_date);
+                        aptDate.setHours(0, 0, 0, 0);
+                        const year = aptDate.getFullYear();
+                        const month = String(aptDate.getMonth() + 1).padStart(2, '0');
+                        const day = String(aptDate.getDate()).padStart(2, '0');
+                        const dateStr = `${year}-${month}-${day}`;
+
+                        if (!appointmentsByDate[dateStr]) {
+                            appointmentsByDate[dateStr] = [];
+                        }
+                        appointmentsByDate[dateStr].push(apt);
+                    });
+
+                    // Tạo dữ liệu cho từng ngày trong tuần
+                    const daysData = weekDates.map((date) => {
+                        const dayOfWeek = getDayOfWeek(date);
+                        const year = date.getFullYear();
+                        const month = String(date.getMonth() + 1).padStart(2, '0');
+                        const day = String(date.getDate()).padStart(2, '0');
+                        const dateStr = `${year}-${month}-${day}`;
+                        const template = hoursTemplate[dayOfWeek] || {};
+
+                        // Tính số slot đã được đặt trong ngày này
+                        const bookedSlots = appointmentsByDate[dateStr]?.length || 0;
+                        const totalSlots = template.totalSlots || 0;
+                        const remainingSlots = Math.max(0, totalSlots - bookedSlots);
+
+                        return {
+                            date: dateStr,
+                            day_of_week: dayOfWeek,
+                            open_time: template.open_time || null,
+                            close_time: template.close_time || null,
+                            is_close: template.is_close || false,
+                            totalSlots: totalSlots,
+                            bookedSlots: bookedSlots,
+                            remainingSlots: remainingSlots,
+                            availableSlots: remainingSlots,
+                        };
+                    });
+
+                    // Format date cho week_start và week_end
+                    const formatDate = (date) => {
+                        const year = date.getFullYear();
+                        const month = String(date.getMonth() + 1).padStart(2, '0');
+                        const day = String(date.getDate()).padStart(2, '0');
+                        return `${year}-${month}-${day}`;
+                    };
+
+                    weeksData.push({
+                        week_number: weekIndex + 1,
+                        week_start: formatDate(weekStart),
+                        week_end: formatDate(weekEnd),
+                        days: daysData,
+                    });
+                }
+
+                return {
+                    ...center,
+                    weeks: weeksData,
+                };
+            })
+        );
 
         return res.status(200).json({
             success: true,
-            message: "Lấy danh sách trung tâm và giờ làm việc thành công",
+            message: `Lấy danh sách trung tâm và giờ làm việc thành công (${weeks} tuần)`,
             data: result,
         });
     } catch (error) {
