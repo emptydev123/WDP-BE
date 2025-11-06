@@ -35,7 +35,7 @@ const auth = require("../middlewares/auth");
  *         name: status
  *         schema:
  *           type: string
- *           enum: [pending, accept, deposited, completed, paid, canceled]
+ *           enum: [pending, assigned, check_in, in_progress, repaired, completed, canceled]
  *         description: Lọc theo trạng thái
  *       - in: query
  *         name: service_center_id
@@ -430,7 +430,7 @@ router.post(
  *                 description: ID của appointment
  *               status:
  *                 type: string
- *                 enum: [pending, assigned, in_progress, done, cancelled]
+ *                 enum: [pending, assigned, check_in, in_progress, repaired, completed, canceled]
  *                 example: "in_progress"
  *                 description: Trạng thái mới
  *     responses:
@@ -477,7 +477,7 @@ router.put(
  *         name: status
  *         schema:
  *           type: string
- *           enum: [pending, accept, deposited, completed, paid, canceled]
+ *           enum: [pending, assigned, check_in, in_progress, repaired, completed, canceled]
  *         description: Lọc theo trạng thái
  *     responses:
  *       200:

@@ -78,7 +78,7 @@ router.post(
 /**
  * @swagger
  * /api/payment/update-status:
- *   post:
+ *   put:
  *     summary: Cập nhật trạng thái thanh toán
  *     tags: [Payments]
  *     security:
@@ -112,7 +112,7 @@ router.post(
  *       500:
  *         description: Lỗi server
  */
-router.post(
+router.put(
   "/update-status",
   auth.authMiddleWare,
   auth.requireRole("customer", "staff", "admin"),

@@ -177,6 +177,12 @@ exports.createPaymentLink = async (req, res) => {
 
 exports.updatePaymentStatus = async (req, res) => {
   try {
+    console.log(
+      "updatePaymentStatus called - Method:",
+      req.method,
+      "Body:",
+      req.body
+    );
     const { order_code, status } = req.body;
 
     if (!order_code || !status) {
@@ -195,7 +201,13 @@ exports.updatePaymentStatus = async (req, res) => {
       });
     }
 
-    const payment = await Payment.findOne({ order_code: parseInt(order_code) });
+    // Tìm payment với cả orderCode và order_code để tương thích
+    const payment = await Payment.findOne({
+      $or: [
+        { orderCode: parseInt(order_code) },
+        { order_code: parseInt(order_code) },
+      ],
+    });
 
     if (!payment) {
       return res.status(404).json({
@@ -204,14 +216,24 @@ exports.updatePaymentStatus = async (req, res) => {
       });
     }
 
-    payment.status = status;
-    if (status === "paid") {
-      payment.paid_at = new Date();
+    // Đảm bảo orderCode được set (nếu payment chỉ có order_code)
+    if (!payment.orderCode && payment.order_code) {
+      payment.orderCode = payment.order_code;
+    }
+    if (!payment.orderCode) {
+      payment.orderCode = parseInt(order_code);
+    }
+
+    // Chuyển đổi status thành chữ hoa để khớp với model enum
+    const normalizedStatus = status.toUpperCase();
+    payment.status = normalizedStatus;
+    if (normalizedStatus === "PAID") {
+      payment.paidAt = new Date();
     }
     await payment.save();
 
-    // Khi payment status = "paid", cập nhật estimated_cost = 0 và status = "assigned" cho appointment
-    if (status === "paid") {
+    // Khi payment status = "PAID", cập nhật estimated_cost = 0 và status = "assigned" cho appointment
+    if (normalizedStatus === "PAID") {
       // Tìm appointment có payment_id hoặc final_payment_id tương ứng
       // Chỉ cập nhật appointment đang pending
       const updateResult = await Appointment.updateMany(
@@ -230,7 +252,9 @@ exports.updatePaymentStatus = async (req, res) => {
       );
     }
 
-    console.log(` Cập nhật trạng thái thanh toán: ${order_code} -> ${status}`);
+    console.log(
+      ` Cập nhật trạng thái thanh toán: ${order_code} -> ${normalizedStatus}`
+    );
 
     return res.status(200).json({
       message: "Cập nhật trạng thái thanh toán thành công",
@@ -238,7 +262,7 @@ exports.updatePaymentStatus = async (req, res) => {
       data: {
         payment_id: payment._id,
         order_code: order_code,
-        status: status,
+        status: normalizedStatus,
         updated_at: new Date(),
       },
     });

@@ -55,6 +55,23 @@ exports.getAppointments = async (req, res) => {
     const query = {};
 
     if (status) {
+      // Validate status theo enum trong model
+      const validStatuses = [
+        "pending",
+        "assigned",
+        "check_in",
+        "in_progress",
+        "repaired",
+        "completed",
+        "canceled",
+      ];
+      if (!validStatuses.includes(status)) {
+        return res.status(400).json({
+          message:
+            "Status không hợp lệ. Chỉ chấp nhận: pending, assigned, check_in, in_progress, repaired, completed, canceled",
+          success: false,
+        });
+      }
       query.status = status;
     }
     if (service_center_id) {
@@ -473,6 +490,23 @@ exports.getMyAppointments = async (req, res) => {
 
     const query = { user_id: userId };
     if (status) {
+      // Validate status theo enum trong model
+      const validStatuses = [
+        "pending",
+        "assigned",
+        "check_in",
+        "in_progress",
+        "repaired",
+        "completed",
+        "canceled",
+      ];
+      if (!validStatuses.includes(status)) {
+        return res.status(400).json({
+          message:
+            "Status không hợp lệ. Chỉ chấp nhận: pending, assigned, check_in, in_progress, repaired, completed, canceled",
+          success: false,
+        });
+      }
       query.status = status;
     }
 
@@ -695,6 +729,23 @@ exports.getAppointmentsByUsername = async (req, res) => {
 
     const query = { user_id: user._id };
     if (status) {
+      // Validate status theo enum trong model
+      const validStatuses = [
+        "pending",
+        "assigned",
+        "check_in",
+        "in_progress",
+        "repaired",
+        "completed",
+        "canceled",
+      ];
+      if (!validStatuses.includes(status)) {
+        return res.status(400).json({
+          message:
+            "Status không hợp lệ. Chỉ chấp nhận: pending, assigned, check_in, in_progress, repaired, completed, canceled",
+          success: false,
+        });
+      }
       query.status = status;
     }
 
@@ -772,6 +823,23 @@ exports.getAppointmentsByTechnician = async (req, res) => {
 
     const query = { technician_id: technicianId };
     if (status) {
+      // Validate status theo enum trong model
+      const validStatuses = [
+        "pending",
+        "assigned",
+        "check_in",
+        "in_progress",
+        "repaired",
+        "completed",
+        "canceled",
+      ];
+      if (!validStatuses.includes(status)) {
+        return res.status(400).json({
+          message:
+            "Status không hợp lệ. Chỉ chấp nhận: pending, assigned, check_in, in_progress, repaired, completed, canceled",
+          success: false,
+        });
+      }
       query.status = status;
     }
 
