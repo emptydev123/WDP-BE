@@ -56,7 +56,7 @@ exports.getAllInventory = async (req, res) => {
         "part_id",
         "part_name description part_number supplier warranty_month"
       )
-      .populate("center_id", "name address phone")
+      .populate("center_id", "center_name address phone")
       .sort({ updatedAt: -1 })
       .skip(pagination.skip)
       .limit(pagination.limit)
@@ -103,7 +103,7 @@ exports.getInventoryById = async (req, res) => {
         "part_id",
         "part_name description part_number supplier warranty_month"
       )
-      .populate("center_id", "name address phone");
+      .populate("center_id", "center_name address phone");
 
     if (!inventory) {
       return res.status(404).json({
@@ -197,7 +197,7 @@ exports.createInventory = async (req, res) => {
         "part_id",
         "part_name description part_number supplier warranty_month"
       )
-      .populate("center_id", "name address phone");
+      .populate("center_id", "center_name address phone");
 
     return res.status(201).json({
       message: "Tạo inventory thành công",
@@ -261,7 +261,7 @@ exports.updateInventory = async (req, res) => {
         "part_id",
         "part_name description part_number supplier warranty_month"
       )
-      .populate("center_id", "name address phone");
+      .populate("center_id", "center_name address phone");
 
     return res.status(200).json({
       message: "Cập nhật inventory thành công",
