@@ -35,6 +35,11 @@ const { authMiddleWare } = require("../middlewares/auth");
  *         schema:
  *           type: string
  *         description: Lọc theo appointment ID
+ *       - in: query
+ *         name: technicianId
+ *         schema:
+ *           type: string
+ *         description: Lọc theo technician ID (lọc checklist của technician này thông qua appointment)
  *     responses:
  *       200:
  *         description: Success
@@ -260,83 +265,6 @@ router.put(
   "/:checklistId/complete",
   authMiddleWare,
   ChecklistController.completeChecklist
-);
-
-/**
- * @swagger
- * /api/checklist/{checklistId}:
- *   get:
- *     summary: Lấy thông tin checklist theo ID
- *     tags: [Checklist]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: checklistId
- *         required: true
- *         schema:
- *           type: string
- *         description: ID của checklist
- *     responses:
- *       200:
- *         description: Lấy thông tin checklist thành công
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   type: string
- *                 success:
- *                   type: boolean
- *                 data:
- *                   type: object
- *                   properties:
- *                     _id:
- *                       type: string
- *                     issue_type_id:
- *                       type: object
- *                       description: Thông tin issue type đã được populate
- *                     appointment_id:
- *                       type: object
- *                       description: Thông tin appointment đã được populate
- *                     issue_description:
- *                       type: string
- *                     solution_applied:
- *                       type: string
- *                     parts:
- *                       type: array
- *                       items:
- *                         type: object
- *                         properties:
- *                           part_id:
- *                             type: object
- *                             description: Thông tin part đã được populate
- *                           quantity:
- *                             type: number
- *                     status:
- *                       type: string
- *                       enum: [pending, accepted, completed, canceled]
- *                     cancellation_note:
- *                       type: string
- *                       description: Lý do hủy (nếu có, chỉ có khi status = canceled)
- *                     createdAt:
- *                       type: string
- *                       format: date-time
- *                     updatedAt:
- *                       type: string
- *                       format: date-time
- *       401:
- *         description: Unauthorized
- *       404:
- *         description: Không tìm thấy checklist
- *       500:
- *         description: Lỗi server
- */
-router.get(
-  "/:checklistId",
-  authMiddleWare,
-  ChecklistController.getChecklistById
 );
 
 module.exports = router;

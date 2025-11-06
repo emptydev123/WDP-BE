@@ -13,7 +13,7 @@ const {
 
 exports.getAllChecklists = async (req, res) => {
   try {
-    const { page = 1, limit = 10, appointment_id } = req.query;
+    const { page = 1, limit = 10, appointment_id, technicianId } = req.query;
     const userId = req._id?.toString();
 
     if (!userId) {
@@ -29,14 +29,42 @@ exports.getAllChecklists = async (req, res) => {
     );
 
     const filter = {};
-    if (appointment_id) filter.appointment_id = appointment_id;
+
+    // Lọc theo technicianId thông qua appointment
+    if (technicianId) {
+      const appointmentsWithTechnician = await Appointment.find({
+        technician_id: technicianId,
+      }).select("_id");
+      const appointmentIds = appointmentsWithTechnician.map((a) => a._id);
+      if (appointmentIds.length > 0) {
+        // Nếu có cả appointment_id và technicianId, lọc cả hai
+        if (appointment_id) {
+          // Kiểm tra appointment_id có trong danh sách appointments của technician không
+          const appointmentIdStr = appointment_id.toString();
+          if (appointmentIds.some((id) => id.toString() === appointmentIdStr)) {
+            filter.appointment_id = appointment_id;
+          } else {
+            // Appointment không thuộc technician này
+            filter.appointment_id = { $in: [] };
+          }
+        } else {
+          filter.appointment_id = { $in: appointmentIds };
+        }
+      } else {
+        // Nếu không có appointment nào với technician này, trả về empty
+        filter.appointment_id = { $in: [] };
+      }
+    } else if (appointment_id) {
+      // Chỉ có appointment_id, không có technicianId
+      filter.appointment_id = appointment_id;
+    }
 
     const total = await Checklist.countDocuments(filter);
     const pagination = createPagination(validatedPage, validatedLimit, total);
 
     const checklists = await Checklist.find(filter)
       .populate("issue_type_id")
-      .populate("appointment_id", "appoinment_date status")
+      .populate("appointment_id", "appoinment_date status technician_id")
       .populate("parts.part_id")
       .sort({ createdAt: -1 })
       .skip(pagination.skip)
@@ -349,47 +377,6 @@ exports.acceptChecklist = async (req, res) => {
     console.error("Accept checklist error:", error);
     return res.status(500).json({
       message: "Lỗi chấp nhận checklist",
-      error: error.message,
-      success: false,
-    });
-  }
-};
-
-// Get checklist by ID
-exports.getChecklistById = async (req, res) => {
-  try {
-    const { checklistId } = req.params;
-    const userId = req._id?.toString();
-
-    if (!userId) {
-      return res.status(401).json({
-        message: "Unauthorized",
-        success: false,
-      });
-    }
-
-    const checklist = await Checklist.findById(checklistId)
-      .populate("issue_type_id")
-      .populate("appointment_id")
-      .populate("parts.part_id")
-      .lean();
-
-    if (!checklist) {
-      return res.status(404).json({
-        message: "Không tìm thấy checklist",
-        success: false,
-      });
-    }
-
-    return res.status(200).json({
-      message: "Lấy thông tin checklist thành công",
-      success: true,
-      data: checklist,
-    });
-  } catch (error) {
-    console.error("Get checklist by ID error:", error);
-    return res.status(500).json({
-      message: "Lỗi lấy thông tin checklist",
       error: error.message,
       success: false,
     });

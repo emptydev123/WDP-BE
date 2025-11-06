@@ -2,6 +2,9 @@
 const Payment = require("../model/payment");
 const Appointment = require("../model/appointment");
 const User = require("../model/user");
+const Vehicle = require("../model/vehicle");
+const VehicleModel = require("../model/vehicleModel");
+const Checklist = require("../model/checklist");
 
 // Doanh thu từ Payments (PAID)
 exports.getRevenue = async (req, res) => {
@@ -633,6 +636,336 @@ exports.getDashboardOverview = async (req, res) => {
     console.error("Get dashboard overview error:", error);
     return res.status(500).json({
       message: "Lỗi lấy dashboard overview",
+      error: error.message,
+      success: false,
+    });
+  }
+};
+
+// Hãng xe nào sửa nhiều nhất trong 3 tuần
+exports.getTopBrandsByRepairs = async (req, res) => {
+  try {
+    const userId = req._id?.toString();
+
+    if (!userId) {
+      return res.status(401).json({
+        message: "Unauthorized",
+        success: false,
+      });
+    }
+
+    // Tính ngày 3 tuần trước
+    const threeWeeksAgo = new Date();
+    threeWeeksAgo.setDate(threeWeeksAgo.getDate() - 21);
+    threeWeeksAgo.setHours(0, 0, 0, 0);
+
+    // Lấy appointments trong 3 tuần qua
+    const appointments = await Appointment.aggregate([
+      {
+        $match: {
+          appoinment_date: { $gte: threeWeeksAgo },
+          status: { $in: ["completed", "repaired", "in_progress"] },
+        },
+      },
+      {
+        $lookup: {
+          from: "vehicles",
+          localField: "vehicle_id",
+          foreignField: "_id",
+          as: "vehicle",
+        },
+      },
+      { $unwind: "$vehicle" },
+      {
+        $lookup: {
+          from: "vehiclemodels",
+          localField: "vehicle.model_id",
+          foreignField: "_id",
+          as: "vehicleModel",
+        },
+      },
+      { $unwind: "$vehicleModel" },
+      {
+        $group: {
+          _id: "$vehicleModel.brand",
+          count: { $sum: 1 },
+        },
+      },
+      { $sort: { count: -1 } },
+      { $limit: 10 },
+    ]);
+
+    const result = appointments.map((item) => ({
+      brand: item._id || "Unknown",
+      repairCount: item.count,
+    }));
+
+    return res.status(200).json({
+      message: "Lấy danh sách hãng xe sửa nhiều nhất thành công",
+      success: true,
+      data: {
+        period: "3 tuần qua",
+        from: threeWeeksAgo,
+        to: new Date(),
+        brands: result,
+      },
+    });
+  } catch (error) {
+    console.error("Get top brands by repairs error:", error);
+    return res.status(500).json({
+      message: "Lỗi lấy danh sách hãng xe sửa nhiều nhất",
+      error: error.message,
+      success: false,
+    });
+  }
+};
+
+// Phụ tùng nào thay nhiều nhất trong tháng
+exports.getTopPartsReplaced = async (req, res) => {
+  try {
+    const userId = req._id?.toString();
+
+    if (!userId) {
+      return res.status(401).json({
+        message: "Unauthorized",
+        success: false,
+      });
+    }
+
+    // Tính ngày đầu tháng hiện tại
+    const startOfMonth = new Date();
+    startOfMonth.setDate(1);
+    startOfMonth.setHours(0, 0, 0, 0);
+
+    // Lấy checklists trong tháng và đã được accepted hoặc completed
+    const checklists = await Checklist.find({
+      createdAt: { $gte: startOfMonth },
+      status: { $in: ["accepted", "completed"] },
+    }).populate("parts.part_id");
+
+    // Tổng hợp số lượng từng part
+    const partCounts = {};
+    checklists.forEach((checklist) => {
+      checklist.parts.forEach((part) => {
+        const partId =
+          part.part_id?._id?.toString() || part.part_id?.toString();
+        const partName = part.part_id?.part_name || "Unknown Part";
+        if (partId) {
+          if (!partCounts[partId]) {
+            partCounts[partId] = {
+              part_id: partId,
+              part_name: partName,
+              totalQuantity: 0,
+            };
+          }
+          partCounts[partId].totalQuantity += part.quantity || 0;
+        }
+      });
+    });
+
+    // Sắp xếp và lấy top 10
+    const result = Object.values(partCounts)
+      .sort((a, b) => b.totalQuantity - a.totalQuantity)
+      .slice(0, 10);
+
+    return res.status(200).json({
+      message: "Lấy danh sách phụ tùng thay nhiều nhất thành công",
+      success: true,
+      data: {
+        period: "Tháng này",
+        from: startOfMonth,
+        to: new Date(),
+        parts: result,
+      },
+    });
+  } catch (error) {
+    console.error("Get top parts replaced error:", error);
+    return res.status(500).json({
+      message: "Lỗi lấy danh sách phụ tùng thay nhiều nhất",
+      error: error.message,
+      success: false,
+    });
+  }
+};
+
+// Nhân viên có nhiều appointment nhất
+exports.getTopTechniciansByAppointments = async (req, res) => {
+  try {
+    const userId = req._id?.toString();
+
+    if (!userId) {
+      return res.status(401).json({
+        message: "Unauthorized",
+        success: false,
+      });
+    }
+
+    const technicians = await Appointment.aggregate([
+      {
+        $match: {
+          technician_id: { $ne: null },
+        },
+      },
+      {
+        $group: {
+          _id: "$technician_id",
+          appointmentCount: { $sum: 1 },
+        },
+      },
+      {
+        $lookup: {
+          from: "users",
+          localField: "_id",
+          foreignField: "_id",
+          as: "technician",
+        },
+      },
+      { $unwind: "$technician" },
+      {
+        $project: {
+          technician_id: "$_id",
+          technician_name: "$technician.fullName",
+          technician_username: "$technician.username",
+          technician_email: "$technician.email",
+          appointmentCount: 1,
+        },
+      },
+      { $sort: { appointmentCount: -1 } },
+      { $limit: 10 },
+    ]);
+
+    return res.status(200).json({
+      message: "Lấy danh sách nhân viên có nhiều appointment nhất thành công",
+      success: true,
+      data: {
+        technicians: technicians.map((t) => ({
+          technician_id: t.technician_id,
+          technician_name: t.technician_name,
+          technician_username: t.technician_username,
+          technician_email: t.technician_email,
+          appointment_count: t.appointmentCount,
+        })),
+      },
+    });
+  } catch (error) {
+    console.error("Get top technicians by appointments error:", error);
+    return res.status(500).json({
+      message: "Lỗi lấy danh sách nhân viên có nhiều appointment nhất",
+      error: error.message,
+      success: false,
+    });
+  }
+};
+
+// Nhân viên kiếm nhiều tiền nhất
+exports.getTopTechniciansByRevenue = async (req, res) => {
+  try {
+    const userId = req._id?.toString();
+
+    if (!userId) {
+      return res.status(401).json({
+        message: "Unauthorized",
+        success: false,
+      });
+    }
+
+    // Lấy appointments có technician và payment đã thanh toán
+    const technicianRevenue = await Appointment.aggregate([
+      {
+        $match: {
+          technician_id: { $ne: null },
+          $or: [
+            { payment_id: { $ne: null } },
+            { final_payment_id: { $ne: null } },
+          ],
+        },
+      },
+      {
+        $lookup: {
+          from: "payments",
+          localField: "payment_id",
+          foreignField: "_id",
+          as: "payment",
+        },
+      },
+      {
+        $lookup: {
+          from: "payments",
+          localField: "final_payment_id",
+          foreignField: "_id",
+          as: "finalPayment",
+        },
+      },
+      {
+        $project: {
+          technician_id: 1,
+          paymentAmount: {
+            $cond: {
+              if: { $eq: [{ $arrayElemAt: ["$payment.status", 0] }, "PAID"] },
+              then: { $arrayElemAt: ["$payment.amount", 0] },
+              else: 0,
+            },
+          },
+          finalPaymentAmount: {
+            $cond: {
+              if: {
+                $eq: [{ $arrayElemAt: ["$finalPayment.status", 0] }, "PAID"],
+              },
+              then: { $arrayElemAt: ["$finalPayment.amount", 0] },
+              else: 0,
+            },
+          },
+        },
+      },
+      {
+        $group: {
+          _id: "$technician_id",
+          totalRevenue: {
+            $sum: {
+              $add: ["$paymentAmount", "$finalPaymentAmount"],
+            },
+          },
+        },
+      },
+      {
+        $lookup: {
+          from: "users",
+          localField: "_id",
+          foreignField: "_id",
+          as: "technician",
+        },
+      },
+      { $unwind: "$technician" },
+      {
+        $project: {
+          technician_id: "$_id",
+          technician_name: "$technician.fullName",
+          technician_username: "$technician.username",
+          technician_email: "$technician.email",
+          totalRevenue: 1,
+        },
+      },
+      { $sort: { totalRevenue: -1 } },
+      { $limit: 10 },
+    ]);
+
+    return res.status(200).json({
+      message: "Lấy danh sách nhân viên kiếm nhiều tiền nhất thành công",
+      success: true,
+      data: {
+        technicians: technicianRevenue.map((t) => ({
+          technician_id: t.technician_id,
+          technician_name: t.technician_name,
+          technician_username: t.technician_username,
+          technician_email: t.technician_email,
+          total_revenue: t.totalRevenue || 0,
+        })),
+      },
+    });
+  } catch (error) {
+    console.error("Get top technicians by revenue error:", error);
+    return res.status(500).json({
+      message: "Lỗi lấy danh sách nhân viên kiếm nhiều tiền nhất",
       error: error.message,
       success: false,
     });

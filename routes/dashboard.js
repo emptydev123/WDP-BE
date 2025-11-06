@@ -171,4 +171,76 @@ router.get(
  */
 router.get("/checkin-rate", authMiddleWare, DashboardController.getCheckinRate);
 
+/**
+ * @swagger
+ * /api/dashboard/top-brands:
+ *   get:
+ *     summary: Hãng xe nào sửa nhiều nhất trong 3 tuần
+ *     tags: [Dashboard]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Danh sách hãng xe sửa nhiều nhất
+ */
+router.get(
+  "/top-brands",
+  authMiddleWare,
+  DashboardController.getTopBrandsByRepairs
+);
+
+/**
+ * @swagger
+ * /api/dashboard/top-parts:
+ *   get:
+ *     summary: Phụ tùng nào thay nhiều nhất trong tháng
+ *     tags: [Dashboard]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Danh sách phụ tùng thay nhiều nhất
+ */
+router.get(
+  "/top-parts",
+  authMiddleWare,
+  DashboardController.getTopPartsReplaced
+);
+
+/**
+ * @swagger
+ * /api/dashboard/top-technicians-appointments:
+ *   get:
+ *     summary: Nhân viên có nhiều appointment nhất
+ *     tags: [Dashboard]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Danh sách nhân viên có nhiều appointment nhất
+ */
+router.get(
+  "/top-technicians-appointments",
+  authMiddleWare,
+  DashboardController.getTopTechniciansByAppointments
+);
+
+/**
+ * @swagger
+ * /api/dashboard/top-technicians-revenue:
+ *   get:
+ *     summary: Nhân viên kiếm nhiều tiền nhất
+ *     tags: [Dashboard]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Danh sách nhân viên kiếm nhiều tiền nhất
+ */
+router.get(
+  "/top-technicians-revenue",
+  authMiddleWare,
+  DashboardController.getTopTechniciansByRevenue
+);
+
 module.exports = router;
