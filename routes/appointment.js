@@ -180,7 +180,7 @@ const auth = require("../middlewares/auth");
 router.get(
   "/list",
   auth.authMiddleWare,
-  auth.requireRole("customer", "staff", "admin"),
+  auth.requireRole("customer", "staff", "technician", "admin"),
   appointment.getAppointments
 );
 
