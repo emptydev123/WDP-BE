@@ -7,6 +7,8 @@ const {
   createPaginatedResponse,
   validatePagination,
 } = require("../utils/pagination");
+const { calculateTimeoutAt } = require("../utils/timeUtils");
+const { PAYMENT_EXPIRED_TIME } = require("../utils/constants");
 
 const payOS = new PayOS(
   process.env.PAYOS_CLIENT_ID,
@@ -61,7 +63,7 @@ function canRetryPayment(payment) {
 
 exports.createPaymentLink = async (req, res) => {
   try {
-    const { amount, description, customer } = req.body;
+    const { amount, description, customer, timeoutSeconds } = req.body;
     const userId = req._id?.toString();
 
     if (!userId) {
@@ -83,6 +85,25 @@ exports.createPaymentLink = async (req, res) => {
         message: "Mô tả thanh toán là bắt buộc",
         success: false,
       });
+    }
+
+    // Validate và tính toán timeoutAt từ timeoutSeconds
+    let timeoutAt;
+    if (timeoutSeconds !== undefined && timeoutSeconds !== null) {
+      const timeoutValue =
+        typeof timeoutSeconds === "string"
+          ? parseInt(timeoutSeconds, 10)
+          : timeoutSeconds;
+      if (isNaN(timeoutValue) || timeoutValue <= 0) {
+        return res.status(400).json({
+          message: "timeoutSeconds phải là số dương (tính bằng giây)",
+          success: false,
+        });
+      }
+      timeoutAt = calculateTimeoutAt(timeoutValue);
+    } else {
+      // Nếu không có timeoutSeconds, dùng default 15 phút
+      timeoutAt = calculateTimeoutAt(PAYMENT_EXPIRED_TIME);
     }
 
     const user = await User.findById(userId).select("-password");
@@ -123,7 +144,7 @@ exports.createPaymentLink = async (req, res) => {
       status: "PENDING",
       checkoutUrl: response.checkoutUrl,
       qrCode: response.qrCode,
-      timeoutAt: new Date(Date.now() + 30 * 1000), // 10 giây
+      timeoutAt: timeoutAt,
       customer: customer || {
         username: user.username,
         fullName: user.fullName,
@@ -585,6 +606,7 @@ exports.handlePayOSWebhook = async (req, res) => {
 exports.retryPayment = async (req, res) => {
   try {
     const { id } = req.params;
+    const { timeoutSeconds } = req.query;
     const userId = req._id?.toString();
 
     if (!userId) {
@@ -631,6 +653,25 @@ exports.retryPayment = async (req, res) => {
       });
     }
 
+    // Validate và tính toán timeoutAt từ timeoutSeconds
+    let timeoutAt;
+    if (timeoutSeconds !== undefined && timeoutSeconds !== null) {
+      const timeoutValue =
+        typeof timeoutSeconds === "string"
+          ? parseInt(timeoutSeconds, 10)
+          : timeoutSeconds;
+      if (isNaN(timeoutValue) || timeoutValue <= 0) {
+        return res.status(400).json({
+          message: "timeoutSeconds phải là số dương (tính bằng giây)",
+          success: false,
+        });
+      }
+      timeoutAt = calculateTimeoutAt(timeoutValue);
+    } else {
+      // Nếu không có timeoutSeconds, dùng default 15 phút
+      timeoutAt = calculateTimeoutAt(PAYMENT_EXPIRED_TIME);
+    }
+
     const newOrderCode = Date.now();
     const BASE = process.env.BASE_URL || "http://localhost:3000";
     const returnUrl = `${BASE}/api/payment/success?orderCode=${newOrderCode}`;
@@ -661,7 +702,7 @@ exports.retryPayment = async (req, res) => {
       status: "PENDING",
       checkoutUrl: response.checkoutUrl,
       qrCode: response.qrCode,
-      timeoutAt: new Date(Date.now() + 15 * 60 * 1000),
+      timeoutAt: timeoutAt,
       retryOf: oldDoc.orderCode,
       customer: oldDoc.customer,
     };
