@@ -32,8 +32,8 @@ const PaymentSchema = new mongoose.Schema(
     expiredAt: Date,
     timeoutAt: {
       type: Date,
-      default: () => new Date(Date.now() + 15 * 60 * 1000),
-    }, // 15 phút
+      required: true,
+    },
     retryOf: Number, // orderCode cũ nếu là đơn retry
     replacedBy: Number, // orderCode mới nếu bị thay thế
     customer: { type: Object, default: undefined },

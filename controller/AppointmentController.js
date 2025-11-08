@@ -19,7 +19,9 @@ const {
   addBufferToTime,
   getCurrentTime,
   isPastDate,
+  calculateTimeoutAt,
 } = require("../utils/timeUtils");
+const { PAYMENT_EXPIRED_TIME } = require("../utils/constants");
 var Technican = require("../model/technican");
 const { getDayOfWeek } = require("../utils/logicSlots");
 var ServiceCenterHours = require("../model/serviceCenterHours");
@@ -1018,6 +1020,7 @@ exports.createFinalPayment = async (req, res) => {
         description: finalPaymentDescription,
         status: "PENDING",
         user_id: appointment.user_id._id,
+        timeoutAt: calculateTimeoutAt(PAYMENT_EXPIRED_TIME), // Default 15 phút cho fallback
       });
 
       await fallbackPayment.save();
@@ -1347,6 +1350,7 @@ exports.createDepositPayment = async (userId, appointmentId) => {
       description,
       status: "PENDING",
       user_id: userId,
+      timeoutAt: calculateTimeoutAt(PAYMENT_EXPIRED_TIME), // Default 15 phút cho fallback
     });
     await fallback.save();
     paymentResult = {

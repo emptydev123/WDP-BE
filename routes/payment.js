@@ -36,6 +36,10 @@ const auth = require("../middlewares/auth");
  *                 type: string
  *                 example: "Bảo dưỡng xe điện"
  *                 description: Mô tả thanh toán (tối đa 25 ký tự)
+ *               timeoutSeconds:
+ *                 type: number
+ *                 example: 900
+ *                 description: Thời gian timeout tính bằng giây (tùy chọn, mặc định 900 giây = 15 phút). Frontend truyền xuống để set timeout cho payment.
  *     responses:
  *       201:
  *         description: Tạo link thanh toán thành công
@@ -329,6 +333,12 @@ router.post("/webhook/payos", payment.handlePayOSWebhook);
  *         schema:
  *           type: string
  *         description: Payment ID to retry
+ *       - in: query
+ *         name: timeoutSeconds
+ *         schema:
+ *           type: number
+ *           example: 900
+ *         description: Thời gian timeout tính bằng giây (tùy chọn, mặc định 900 giây = 15 phút). Frontend truyền xuống để set timeout cho payment retry.
  *     responses:
  *       201:
  *         description: Retry payment created successfully

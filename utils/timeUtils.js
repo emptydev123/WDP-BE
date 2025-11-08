@@ -132,7 +132,7 @@ exports.getWeekDates = (startDate, weekIndex) => {
 
   // Tính thứ 2 của tuần thứ weekIndex (0 = tuần hiện tại, 1 = tuần sau, ...)
   const mondayOfTargetWeek = new Date(mondayOfCurrentWeek);
-  mondayOfTargetWeek.setDate(mondayOfCurrentWeek.getDate() + (weekIndex * 7));
+  mondayOfTargetWeek.setDate(mondayOfCurrentWeek.getDate() + weekIndex * 7);
 
   // Lấy 5 ngày làm việc (Monday-Friday)
   for (let i = 0; i < 5; i++) {
@@ -141,4 +141,18 @@ exports.getWeekDates = (startDate, weekIndex) => {
     dates.push(date);
   }
   return dates;
-}
+};
+
+/**
+ * Tính toán timeoutAt từ timeoutSeconds
+ * @param {number|string} timeoutSeconds - Thời gian timeout tính bằng giây
+ * @returns {Date} Date object cho timeoutAt
+ */
+exports.calculateTimeoutAt = (timeoutSeconds) => {
+  const timeoutValue =
+    typeof timeoutSeconds === "string"
+      ? parseInt(timeoutSeconds, 10)
+      : timeoutSeconds;
+
+  return new Date(Date.now() + timeoutValue * 1000);
+};
