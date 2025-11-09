@@ -16,12 +16,11 @@ const appointmentSchema = new schema(
       type: String,
       enum: [
         "pending",
-        "deposited",
-        "accepted",
         "assigned",
+        "check_in",
         "in_progress",
+        "repaired",
         "completed",
-        "paid",
         "canceled",
       ],
       default: "pending",
@@ -55,7 +54,11 @@ const appointmentSchema = new schema(
       ref: "User",
       required: false,
     },
-    // technician_id will be defined below with default
+    technician_id: {
+      type: mongoose.Types.ObjectId,
+      ref: "User",
+      required: false,
+    },
     payment_id: {
       type: mongoose.Types.ObjectId,
       ref: "Payment",
@@ -77,15 +80,13 @@ const appointmentSchema = new schema(
       required: false,
       default: null,
     },
-    assigned: {
+    checkin_by: {
       type: mongoose.Types.ObjectId,
       ref: "User",
       required: false,
-      default: null,
     },
-    assigned_by: {
-      type: mongoose.Types.ObjectId,
-      ref: "User",
+    checkin_datetime: {
+      type: Date,
       required: false,
       default: null,
     },
@@ -98,7 +99,7 @@ const appointmentSchema = new schema(
       type: Date,
       required: false,
       default: null,
-    }
+    },
   },
   { timestamps: true }
 );

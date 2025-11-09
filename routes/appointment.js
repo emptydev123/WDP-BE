@@ -35,7 +35,7 @@ const auth = require("../middlewares/auth");
  *         name: status
  *         schema:
  *           type: string
- *           enum: [pending, accept, deposited, completed, paid, canceled]
+ *           enum: [pending, assigned, check_in, in_progress, repaired, completed, canceled]
  *         description: Lọc theo trạng thái
  *       - in: query
  *         name: service_center_id
@@ -180,7 +180,7 @@ const auth = require("../middlewares/auth");
 router.get(
   "/list",
   auth.authMiddleWare,
-  auth.requireRole("customer", "staff", "admin"),
+  auth.requireRole("customer", "staff", "technician", "admin"),
   appointment.getAppointments
 );
 
@@ -299,7 +299,7 @@ router.get(
  *                       type: string
  *                       format: date-time
  *       400:
-   *         description: |
+ *         description: |
  *           Lỗi validation:
  *           - Thiếu thông tin bắt buộc
  *           - Vi phạm quy tắc đặt lịch (trùng lịch, overlap thời gian)
@@ -406,7 +406,6 @@ router.post(
 //   appointment.getTechnicianSchedule
 // );
 
-
 /**
  * @swagger
  * /api/appointment/update-status:
@@ -431,7 +430,7 @@ router.post(
  *                 description: ID của appointment
  *               status:
  *                 type: string
- *                 enum: [pending, assigned, in_progress, done, cancelled]
+ *                 enum: [pending, assigned, check_in, in_progress, repaired, completed, canceled]
  *                 example: "in_progress"
  *                 description: Trạng thái mới
  *     responses:
@@ -478,7 +477,7 @@ router.put(
  *         name: status
  *         schema:
  *           type: string
- *           enum: [pending, accept, deposited, completed, paid, canceled]
+ *           enum: [pending, assigned, check_in, in_progress, repaired, completed, canceled]
  *         description: Lọc theo trạng thái
  *     responses:
  *       200:

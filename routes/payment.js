@@ -36,6 +36,10 @@ const auth = require("../middlewares/auth");
  *                 type: string
  *                 example: "Bảo dưỡng xe điện"
  *                 description: Mô tả thanh toán (tối đa 25 ký tự)
+ *               timeoutSeconds:
+ *                 type: number
+ *                 example: 900
+ *                 description: Thời gian timeout tính bằng giây (tùy chọn, mặc định 900 giây = 15 phút). Frontend truyền xuống để set timeout cho payment.
  *     responses:
  *       201:
  *         description: Tạo link thanh toán thành công
@@ -78,7 +82,7 @@ router.post(
 /**
  * @swagger
  * /api/payment/update-status:
- *   post:
+ *   put:
  *     summary: Cập nhật trạng thái thanh toán
  *     tags: [Payments]
  *     security:
@@ -112,7 +116,7 @@ router.post(
  *       500:
  *         description: Lỗi server
  */
-router.post(
+router.put(
   "/update-status",
   auth.authMiddleWare,
   auth.requireRole("customer", "staff", "admin"),
@@ -329,6 +333,12 @@ router.post("/webhook/payos", payment.handlePayOSWebhook);
  *         schema:
  *           type: string
  *         description: Payment ID to retry
+ *       - in: query
+ *         name: timeoutSeconds
+ *         schema:
+ *           type: number
+ *           example: 900
+ *         description: Thời gian timeout tính bằng giây (tùy chọn, mặc định 900 giây = 15 phút). Frontend truyền xuống để set timeout cho payment retry.
  *     responses:
  *       201:
  *         description: Retry payment created successfully
@@ -392,70 +402,6 @@ router.post(
  *       401:
  *         description: Unauthorized
  */
-/**
- * @swagger
- * /api/payment/test-retry/{orderCode}:
- *   get:
- *     summary: Test retry functionality for a payment
- *     tags: [Payments]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: orderCode
- *         required: true
- *         schema:
- *           type: number
- *         description: Order code to test retry functionality
- *     responses:
- *       200:
- *         description: Retry functionality test completed
- *       400:
- *         description: Bad request
- *       401:
- *         description: Unauthorized
- *       404:
- *         description: Payment not found
- */
-/**
- * @swagger
- * /api/payment/history/appointment/{appointmentId}:
- *   get:
- *     summary: Get payment history for an appointment
- *     tags: [Payments]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: appointmentId
- *         required: true
- *         schema:
- *           type: string
- *         description: Appointment ID to get payment history
- *     responses:
- *       200:
- *         description: Payment history retrieved successfully
- *       400:
- *         description: Bad request
- *       401:
- *         description: Unauthorized
- *       404:
- *         description: Appointment not found
- */
-router.get(
-  "/history/appointment/:appointmentId",
-  auth.authMiddleWare,
-  auth.requireRole("customer", "staff", "admin"),
-  payment.getPaymentHistoryByAppointment
-);
-
-router.get(
-  "/test-retry/:orderCode",
-  auth.authMiddleWare,
-  auth.requireRole("customer", "staff", "admin"),
-  payment.testRetryFunctionality
-);
-
 router.get(
   "/timeout-check",
   auth.authMiddleWare,

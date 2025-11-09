@@ -1,11 +1,14 @@
 ﻿const { PayOS } = require("@payos/node");
 const User = require("../model/user");
 const Payment = require("../model/payment");
+const Appointment = require("../model/appointment");
 const {
   createPagination,
   createPaginatedResponse,
   validatePagination,
 } = require("../utils/pagination");
+const { calculateTimeoutAt } = require("../utils/timeUtils");
+const { PAYMENT_EXPIRED_TIME } = require("../utils/constants");
 
 const payOS = new PayOS(
   process.env.PAYOS_CLIENT_ID,
@@ -60,7 +63,7 @@ function canRetryPayment(payment) {
 
 exports.createPaymentLink = async (req, res) => {
   try {
-    const { amount, description, customer } = req.body;
+    const { amount, description, customer, timeoutSeconds } = req.body;
     const userId = req._id?.toString();
 
     if (!userId) {
@@ -82,6 +85,25 @@ exports.createPaymentLink = async (req, res) => {
         message: "Mô tả thanh toán là bắt buộc",
         success: false,
       });
+    }
+
+    // Validate và tính toán timeoutAt từ timeoutSeconds
+    let timeoutAt;
+    if (timeoutSeconds !== undefined && timeoutSeconds !== null) {
+      const timeoutValue =
+        typeof timeoutSeconds === "string"
+          ? parseInt(timeoutSeconds, 10)
+          : timeoutSeconds;
+      if (isNaN(timeoutValue) || timeoutValue <= 0) {
+        return res.status(400).json({
+          message: "timeoutSeconds phải là số dương (tính bằng giây)",
+          success: false,
+        });
+      }
+      timeoutAt = calculateTimeoutAt(timeoutValue);
+    } else {
+      // Nếu không có timeoutSeconds, dùng default 15 phút
+      timeoutAt = calculateTimeoutAt(PAYMENT_EXPIRED_TIME);
     }
 
     const user = await User.findById(userId).select("-password");
@@ -122,7 +144,7 @@ exports.createPaymentLink = async (req, res) => {
       status: "PENDING",
       checkoutUrl: response.checkoutUrl,
       qrCode: response.qrCode,
-      timeoutAt: new Date(Date.now() + 30 * 1000), // 10 giây
+      timeoutAt: timeoutAt,
       customer: customer || {
         username: user.username,
         fullName: user.fullName,
@@ -176,6 +198,12 @@ exports.createPaymentLink = async (req, res) => {
 
 exports.updatePaymentStatus = async (req, res) => {
   try {
+    console.log(
+      "updatePaymentStatus called - Method:",
+      req.method,
+      "Body:",
+      req.body
+    );
     const { order_code, status } = req.body;
 
     if (!order_code || !status) {
@@ -194,7 +222,13 @@ exports.updatePaymentStatus = async (req, res) => {
       });
     }
 
-    const payment = await Payment.findOne({ order_code: parseInt(order_code) });
+    // Tìm payment với cả orderCode và order_code để tương thích
+    const payment = await Payment.findOne({
+      $or: [
+        { orderCode: parseInt(order_code) },
+        { order_code: parseInt(order_code) },
+      ],
+    });
 
     if (!payment) {
       return res.status(404).json({
@@ -203,13 +237,45 @@ exports.updatePaymentStatus = async (req, res) => {
       });
     }
 
-    payment.status = status;
-    if (status === "paid") {
-      payment.paid_at = new Date();
+    // Đảm bảo orderCode được set (nếu payment chỉ có order_code)
+    if (!payment.orderCode && payment.order_code) {
+      payment.orderCode = payment.order_code;
+    }
+    if (!payment.orderCode) {
+      payment.orderCode = parseInt(order_code);
+    }
+
+    // Chuyển đổi status thành chữ hoa để khớp với model enum
+    const normalizedStatus = status.toUpperCase();
+    payment.status = normalizedStatus;
+    if (normalizedStatus === "PAID") {
+      payment.paidAt = new Date();
     }
     await payment.save();
 
-    console.log(` Cập nhật trạng thái thanh toán: ${order_code} -> ${status}`);
+    // Khi payment status = "PAID", cập nhật estimated_cost = 0 và status = "assigned" cho appointment
+    if (normalizedStatus === "PAID") {
+      // Tìm appointment có payment_id hoặc final_payment_id tương ứng
+      // Chỉ cập nhật appointment đang pending
+      const updateResult = await Appointment.updateMany(
+        {
+          $or: [{ payment_id: payment._id }, { final_payment_id: payment._id }],
+          status: "pending", // Chỉ cập nhật appointment đang pending
+          estimated_cost: { $ne: 0 },
+        },
+        {
+          estimated_cost: 0,
+          status: "assigned", // Cập nhật status thành assigned khi đã thanh toán
+        }
+      );
+      console.log(
+        `Updated ${updateResult.modifiedCount} appointments with payment ${payment._id} (status -> assigned, estimated_cost -> 0)`
+      );
+    }
+
+    console.log(
+      ` Cập nhật trạng thái thanh toán: ${order_code} -> ${normalizedStatus}`
+    );
 
     return res.status(200).json({
       message: "Cập nhật trạng thái thanh toán thành công",
@@ -217,7 +283,7 @@ exports.updatePaymentStatus = async (req, res) => {
       data: {
         payment_id: payment._id,
         order_code: order_code,
-        status: status,
+        status: normalizedStatus,
         updated_at: new Date(),
       },
     });
@@ -467,6 +533,27 @@ exports.handlePayOSWebhook = async (req, res) => {
         JSON.stringify(req.body)
       );
     } else {
+      // Kiểm tra payment hiện tại
+      const existingPayment = await Payment.findOne({
+        orderCode: Number(orderCode),
+      });
+
+      // Nếu đã PAID và webhook lại đến, không cần xử lý lại (idempotency)
+      if (
+        existingPayment &&
+        existingPayment.status === "PAID" &&
+        status === "PAID"
+      ) {
+        console.log(
+          `[Webhook] Payment ${orderCode} đã PAID trước đó, bỏ qua duplicate webhook`
+        );
+        return res.json({
+          error: 0,
+          message: "Ok (duplicate webhook ignored)",
+          data: { orderCode, status: "PAID", duplicate: true },
+        });
+      }
+
       const updatedPayment = await Payment.findOneAndUpdate(
         { orderCode: Number(orderCode) },
         {
@@ -478,9 +565,30 @@ exports.handlePayOSWebhook = async (req, res) => {
       );
 
       console.log("Updated payment:", updatedPayment ? "SUCCESS" : "NOT FOUND");
-    }
 
-    console.log("=== WEBHOOK PROCESSING COMPLETE ===");
+      // Chỉ cập nhật appointment khi status = PAID và payment đã được update
+      if (status === "PAID" && updatedPayment) {
+        // Đảm bảo không cập nhật nhiều lần (idempotency)
+        // Chỉ cập nhật appointment có status = "pending" và chưa có estimated_cost = 0
+        const updateResult = await Appointment.updateMany(
+          {
+            $or: [
+              { payment_id: updatedPayment._id },
+              { final_payment_id: updatedPayment._id },
+            ],
+            status: "pending", // Chỉ cập nhật appointment đang pending
+            estimated_cost: { $ne: 0 },
+          },
+          {
+            estimated_cost: 0,
+            status: "assigned", // Cập nhật status thành assigned khi đã thanh toán
+          }
+        );
+        console.log(
+          `Updated ${updateResult.modifiedCount} appointments with payment ${updatedPayment._id} (status -> assigned, estimated_cost -> 0)`
+        );
+      }
+    }
 
     return res.json({ error: 0, message: "Ok", data: { orderCode, status } });
   } catch (error) {
@@ -495,10 +603,10 @@ exports.handlePayOSWebhook = async (req, res) => {
   }
 };
 
-// ========== RETRY PAYMENT ==========
 exports.retryPayment = async (req, res) => {
   try {
     const { id } = req.params;
+    const { timeoutSeconds } = req.query;
     const userId = req._id?.toString();
 
     if (!userId) {
@@ -545,6 +653,25 @@ exports.retryPayment = async (req, res) => {
       });
     }
 
+    // Validate và tính toán timeoutAt từ timeoutSeconds
+    let timeoutAt;
+    if (timeoutSeconds !== undefined && timeoutSeconds !== null) {
+      const timeoutValue =
+        typeof timeoutSeconds === "string"
+          ? parseInt(timeoutSeconds, 10)
+          : timeoutSeconds;
+      if (isNaN(timeoutValue) || timeoutValue <= 0) {
+        return res.status(400).json({
+          message: "timeoutSeconds phải là số dương (tính bằng giây)",
+          success: false,
+        });
+      }
+      timeoutAt = calculateTimeoutAt(timeoutValue);
+    } else {
+      // Nếu không có timeoutSeconds, dùng default 15 phút
+      timeoutAt = calculateTimeoutAt(PAYMENT_EXPIRED_TIME);
+    }
+
     const newOrderCode = Date.now();
     const BASE = process.env.BASE_URL || "http://localhost:3000";
     const returnUrl = `${BASE}/api/payment/success?orderCode=${newOrderCode}`;
@@ -575,7 +702,7 @@ exports.retryPayment = async (req, res) => {
       status: "PENDING",
       checkoutUrl: response.checkoutUrl,
       qrCode: response.qrCode,
-      timeoutAt: new Date(Date.now() + 15 * 60 * 1000),
+      timeoutAt: timeoutAt,
       retryOf: oldDoc.orderCode,
       customer: oldDoc.customer,
     };
@@ -847,158 +974,6 @@ exports.debugAllPayments = async (req, res) => {
     return res.status(500).json({
       message: "Debug failed",
       error: error.message,
-      success: false,
-    });
-  }
-};
-
-// ========== TEST RETRY FUNCTIONALITY ==========
-exports.testRetryFunctionality = async (req, res) => {
-  try {
-    const { orderCode } = req.params;
-
-    if (!orderCode) {
-      return res.status(400).json({
-        message: "Missing orderCode parameter",
-        success: false,
-      });
-    }
-
-    const payment = await Payment.findOne({ orderCode: Number(orderCode) });
-
-    if (!payment) {
-      return res.status(404).json({
-        message: "Payment not found",
-        success: false,
-      });
-    }
-
-    const retryInfo = {
-      orderCode: payment.orderCode,
-      status: payment.status,
-      canRetry: canRetryPayment(payment),
-      timeoutAt: payment.timeoutAt,
-      isTimeout: isTimeout(payment),
-      retryOf: payment.retryOf,
-      replacedBy: payment.replacedBy,
-    };
-
-    console.log("Retry functionality test:", retryInfo);
-
-    return res.json({
-      message: "Retry functionality test completed",
-      success: true,
-      data: retryInfo,
-    });
-  } catch (error) {
-    console.error("Test retry functionality error:", error);
-    return res.status(500).json({
-      message: "Internal server error",
-      success: false,
-    });
-  }
-};
-
-// ========== GET PAYMENT HISTORY BY APPOINTMENT ==========
-exports.getPaymentHistoryByAppointment = async (req, res) => {
-  try {
-    const { appointmentId } = req.params;
-    const userId = req._id?.toString();
-
-    if (!userId) {
-      return res.status(401).json({
-        message: "Unauthorized",
-        success: false,
-      });
-    }
-
-    if (!appointmentId) {
-      return res.status(400).json({
-        message: "Missing appointmentId parameter",
-        success: false,
-      });
-    }
-
-    // Tìm appointment
-    const Appointment = require("../model/appointment");
-    const appointment = await Appointment.findOne({
-      _id: appointmentId,
-      user_id: userId,
-    }).populate("payment_id final_payment_id");
-
-    if (!appointment) {
-      return res.status(404).json({
-        message: "Appointment not found",
-        success: false,
-      });
-    }
-
-    // Tìm tất cả payments liên quan
-    const paymentIds = [];
-    if (appointment.payment_id) paymentIds.push(appointment.payment_id._id);
-
-    // Tìm payments gốc và retry chain
-    const originalPayments = await Payment.find({
-      _id: { $in: paymentIds },
-    });
-
-    const orderCodes = originalPayments.map((p) => p.orderCode);
-    const retryPayments = await Payment.find({
-      $or: [
-        { retryOf: { $in: orderCodes } },
-        { replacedBy: { $in: orderCodes } },
-      ],
-    });
-
-    const allPayments = [...originalPayments, ...retryPayments].sort(
-      (a, b) => new Date(a.createdAt) - new Date(b.createdAt)
-    );
-
-    const paymentHistory = allPayments.map((p) => ({
-      orderCode: p.orderCode,
-      status: p.status,
-      amount: p.amount,
-      description: p.description,
-      createdAt: p.createdAt,
-      updatedAt: p.updatedAt,
-      paidAt: p.paidAt,
-      cancelledAt: p.cancelledAt,
-      timeoutAt: p.timeoutAt,
-      retryOf: p.retryOf,
-      replacedBy: p.replacedBy,
-      canRetry: canRetryPayment(p),
-      isTimeout: isTimeout(p),
-      isCurrent: p._id.toString() === appointment.payment_id?._id?.toString(),
-    }));
-
-    console.log("Payment history for appointment:", {
-      appointmentId,
-      totalPayments: paymentHistory.length,
-      currentPayment: paymentHistory.find((p) => p.isCurrent),
-    });
-
-    return res.json({
-      message: "Payment history retrieved successfully",
-      success: true,
-      data: {
-        appointmentId,
-        currentPayment: paymentHistory.find((p) => p.isCurrent),
-        paymentHistory,
-        summary: {
-          totalPayments: paymentHistory.length,
-          paidPayments: paymentHistory.filter((p) => p.status === "PAID")
-            .length,
-          pendingPayments: paymentHistory.filter((p) => p.status === "PENDING")
-            .length,
-          failedPayments: paymentHistory.filter((p) => p.status === "FAILED")
-            .length,
-        },
-      },
-    });
-  } catch (error) {
-    console.error("Get payment history by appointment error:", error);
-    return res.status(500).json({
-      message: "Internal server error",
       success: false,
     });
   }

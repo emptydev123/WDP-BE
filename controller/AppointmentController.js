@@ -19,11 +19,13 @@ const {
   addBufferToTime,
   getCurrentTime,
   isPastDate,
+  calculateTimeoutAt,
 } = require("../utils/timeUtils");
-var Technican = require('../model/technican')
-const { getDayOfWeek } = require('../utils/logicSlots')
-var ServiceCenterHours = require('../model/serviceCenterHours')
-const { checkAndUpdateSlotsForNextWeek } = require('../utils/logicSlots')
+const { PAYMENT_EXPIRED_TIME } = require("../utils/constants");
+var Technican = require("../model/technican");
+const { getDayOfWeek } = require("../utils/logicSlots");
+var ServiceCenterHours = require("../model/serviceCenterHours");
+const { checkAndUpdateSlotsForNextWeek } = require("../utils/logicSlots");
 exports.getAppointments = async (req, res) => {
   try {
     const {
@@ -55,6 +57,23 @@ exports.getAppointments = async (req, res) => {
     const query = {};
 
     if (status) {
+      // Validate status theo enum trong model
+      const validStatuses = [
+        "pending",
+        "assigned",
+        "check_in",
+        "in_progress",
+        "repaired",
+        "completed",
+        "canceled",
+      ];
+      if (!validStatuses.includes(status)) {
+        return res.status(400).json({
+          message:
+            "Status không hợp lệ. Chỉ chấp nhận: pending, assigned, check_in, in_progress, repaired, completed, canceled",
+          success: false,
+        });
+      }
       query.status = status;
     }
     if (service_center_id) {
@@ -78,7 +97,7 @@ exports.getAppointments = async (req, res) => {
         $gte: startOfToday,
         $lte: endOfToday,
       };
-      query.status = { $in: ["in_progress", "assigned", "accepted"] };
+      query.status = { $in: ["in_progress", "assigned", "check_in"] };
       query.technician_id = { $ne: null };
     }
 
@@ -219,12 +238,14 @@ exports.getTechnicianSchedule = async (req, res) => {
       }
 
       const schedules = await Appointment.find({
-        assigned: technician_id,
+        technician_id: technician_id,
         appoinment_date: {
           $gte: fromDate,
           $lte: toDate,
         },
-        status: { $in: ["accepted", "assigned", "in_progress", "completed"] },
+        status: {
+          $in: ["assigned", "check_in", "in_progress", "repaired", "completed"],
+        },
       })
         .populate("user_id", "fullName phone")
         .populate("vehicle_id", "license_plate brand model")
@@ -285,7 +306,15 @@ exports.getTechnicianSchedule = async (req, res) => {
             $gte: fromDate,
             $lte: toDate,
           },
-          status: { $in: ["accepted", "assigned", "in_progress", "completed"] },
+          status: {
+            $in: [
+              "assigned",
+              "check_in",
+              "in_progress",
+              "repaired",
+              "completed",
+            ],
+          },
         })
           .populate("user_id", "fullName phone")
           .populate("vehicle_id", "license_plate brand model")
@@ -463,6 +492,23 @@ exports.getMyAppointments = async (req, res) => {
 
     const query = { user_id: userId };
     if (status) {
+      // Validate status theo enum trong model
+      const validStatuses = [
+        "pending",
+        "assigned",
+        "check_in",
+        "in_progress",
+        "repaired",
+        "completed",
+        "canceled",
+      ];
+      if (!validStatuses.includes(status)) {
+        return res.status(400).json({
+          message:
+            "Status không hợp lệ. Chỉ chấp nhận: pending, assigned, check_in, in_progress, repaired, completed, canceled",
+          success: false,
+        });
+      }
       query.status = status;
     }
 
@@ -529,17 +575,18 @@ exports.updateAppointmentStatus = async (req, res) => {
 
     const validStatuses = [
       "pending",
-      "accepted",
-      "deposited",
+      "assigned",
+      "check_in",
       "in_progress",
+      "repaired",
       "completed",
-      "paid",
+      "delay",
       "canceled",
     ];
     if (!validStatuses.includes(status)) {
       return res.status(400).json({
         message:
-          "Status không hợp lệ. Chỉ chấp nhận: pending, accepted, deposited, in_progress, completed, paid, canceled",
+          "Status không hợp lệ. Chỉ chấp nhận: pending, assigned, check_in, in_progress, repaired, completed, delay, canceled",
         success: false,
       });
     }
@@ -576,17 +623,8 @@ exports.updateAppointmentStatus = async (req, res) => {
       }
     }
 
-    if (oldStatus === "pending" && status === "deposited") {
-      const depositAmount = appointment.payment_id?.amount || 100000;
-      appointment.estimated_cost = Math.max(
-        0,
-        appointment.estimated_cost - depositAmount
-      );
-    }
-
-    if (status === "paid") {
-      appointment.estimated_cost = 0;
-    }
+    // Logic xử lý estimated_cost khi status thay đổi
+    // estimated_cost được quản lý bởi payment flow (set 0 khi payment paid)
 
     await appointment.save();
 
@@ -693,6 +731,23 @@ exports.getAppointmentsByUsername = async (req, res) => {
 
     const query = { user_id: user._id };
     if (status) {
+      // Validate status theo enum trong model
+      const validStatuses = [
+        "pending",
+        "assigned",
+        "check_in",
+        "in_progress",
+        "repaired",
+        "completed",
+        "canceled",
+      ];
+      if (!validStatuses.includes(status)) {
+        return res.status(400).json({
+          message:
+            "Status không hợp lệ. Chỉ chấp nhận: pending, assigned, check_in, in_progress, repaired, completed, canceled",
+          success: false,
+        });
+      }
       query.status = status;
     }
 
@@ -770,6 +825,23 @@ exports.getAppointmentsByTechnician = async (req, res) => {
 
     const query = { technician_id: technicianId };
     if (status) {
+      // Validate status theo enum trong model
+      const validStatuses = [
+        "pending",
+        "assigned",
+        "check_in",
+        "in_progress",
+        "repaired",
+        "completed",
+        "canceled",
+      ];
+      if (!validStatuses.includes(status)) {
+        return res.status(400).json({
+          message:
+            "Status không hợp lệ. Chỉ chấp nhận: pending, assigned, check_in, in_progress, repaired, completed, canceled",
+          success: false,
+        });
+      }
       query.status = status;
     }
 
@@ -891,9 +963,10 @@ exports.createFinalPayment = async (req, res) => {
       });
     }
 
-    if (appointment.status !== "completed") {
+    if (appointment.status !== "repaired") {
       return res.status(400).json({
-        message: "Chỉ có thể tạo final payment cho appointment đã hoàn thành",
+        message:
+          "Chỉ có thể tạo final payment cho appointment đã sửa chữa xong",
         success: false,
       });
     }
@@ -947,6 +1020,7 @@ exports.createFinalPayment = async (req, res) => {
         description: finalPaymentDescription,
         status: "PENDING",
         user_id: appointment.user_id._id,
+        timeoutAt: calculateTimeoutAt(PAYMENT_EXPIRED_TIME), // Default 15 phút cho fallback
       });
 
       await fallbackPayment.save();
@@ -1012,8 +1086,8 @@ exports.validateAppointmentRules = async ({
   const newStart = buildLocalDateTime(appoinment_date, appoinment_time);
   const newEnd = new Date(
     newStart.getTime() +
-    parseDurationToMs(serviceType.estimated_duration) +
-    BUFFER_MS
+      parseDurationToMs(serviceType.estimated_duration) +
+      BUFFER_MS
   );
 
   const activeStatuses = ["pending", "in_progress"];
@@ -1073,8 +1147,8 @@ exports.validateAppointmentRules = async ({
     );
     const existingEnd = new Date(
       existingStart.getTime() +
-      parseDurationToMs(existingDurationStr) +
-      BUFFER_MS
+        parseDurationToMs(existingDurationStr) +
+        BUFFER_MS
     );
 
     const overlap =
@@ -1124,7 +1198,10 @@ exports.autoAssignTechnician = async ({
       const techUserId = tech.user_id._id.toString();
 
       // Bỏ qua technician nếu bị exclude
-      if (excludeTechnicianId && techUserId === excludeTechnicianId.toString()) {
+      if (
+        excludeTechnicianId &&
+        techUserId === excludeTechnicianId.toString()
+      ) {
         continue;
       }
 
@@ -1136,7 +1213,7 @@ exports.autoAssignTechnician = async ({
           $lte: appointmentDateEnd,
         },
         status: {
-          $in: ["pending", "accepted", "assigned", "in_progress", "deposited"],
+          $in: ["pending", "assigned", "check_in", "in_progress"],
         },
       });
 
@@ -1153,7 +1230,7 @@ exports.autoAssignTechnician = async ({
           $lte: appointmentDateEnd,
         },
         status: {
-          $in: ["pending", "accepted", "assigned", "in_progress", "deposited"],
+          $in: ["pending", "assigned", "check_in", "in_progress"],
         },
       })
         .populate("service_type_id")
@@ -1166,8 +1243,8 @@ exports.autoAssignTechnician = async ({
       const newStart = buildLocalDateTime(appoinment_date, appoinment_time);
       const newEnd = new Date(
         newStart.getTime() +
-        parseDurationToMs(serviceType.estimated_duration) +
-        BUFFER_MS
+          parseDurationToMs(serviceType.estimated_duration) +
+          BUFFER_MS
       );
 
       for (const existingAppt of conflictingAppointments) {
@@ -1190,8 +1267,8 @@ exports.autoAssignTechnician = async ({
 
         const existingEnd = new Date(
           existingStart.getTime() +
-          parseDurationToMs(existingDurationStr) +
-          BUFFER_MS
+            parseDurationToMs(existingDurationStr) +
+            BUFFER_MS
         );
 
         // Check overlap
@@ -1273,6 +1350,7 @@ exports.createDepositPayment = async (userId, appointmentId) => {
       description,
       status: "PENDING",
       user_id: userId,
+      timeoutAt: calculateTimeoutAt(PAYMENT_EXPIRED_TIME), // Default 15 phút cho fallback
     });
     await fallback.save();
     paymentResult = {
@@ -1289,7 +1367,16 @@ exports.createDepositPayment = async (userId, appointmentId) => {
 
 exports.createAppointment = async (req, res) => {
   try {
-    const { appoinment_date, appoinment_time, notes, user_id, vehicle_id, center_id, service_type_id, technician_id } = req.body;
+    const {
+      appoinment_date,
+      appoinment_time,
+      notes,
+      user_id,
+      vehicle_id,
+      center_id,
+      service_type_id,
+      technician_id,
+    } = req.body;
     const userId = req._id?.toString();
 
     if (!userId)
@@ -1304,7 +1391,9 @@ exports.createAppointment = async (req, res) => {
     ]);
 
     if (!user || !vehicle || !serviceCenter || !serviceType)
-      return res.status(404).json({ message: "Thông tin không hợp lệ", success: false });
+      return res
+        .status(404)
+        .json({ message: "Thông tin không hợp lệ", success: false });
 
     //  Reset slot nếu người dùng đặt cho tuần sau mà cron chưa reset
     await checkAndUpdateSlotsForNextWeek(appoinment_date, center_id);
@@ -1329,12 +1418,18 @@ exports.createAppointment = async (req, res) => {
       });
     }
 
-
     //  Kiểm tra quy tắc đặt lịch khác (nếu có)
     const existingAppointments = await Appointment.find({
       user_id,
       status: {
-        $in: ["pending", "confirmed", "in_progress", "deposited", "completed", "paid"],
+        $in: [
+          "pending",
+          "assigned",
+          "check_in",
+          "in_progress",
+          "repaired",
+          "completed",
+        ],
       },
     }).populate("service_type_id center_id vehicle_id");
 
@@ -1390,13 +1485,14 @@ exports.createAppointment = async (req, res) => {
           $lte: appointmentDateEnd,
         },
         status: {
-          $in: ["pending", "accepted", "assigned", "in_progress", "deposited"],
+          $in: ["pending", "assigned", "check_in", "in_progress"],
         },
       });
 
       if (appointmentsInDay >= 4) {
         return res.status(400).json({
-          message: "Technician đã đủ 4 slot trong ngày. Vui lòng chọn technician khác hoặc để hệ thống tự động phân công.",
+          message:
+            "Technician đã đủ 4 slot trong ngày. Vui lòng chọn technician khác hoặc để hệ thống tự động phân công.",
           success: false,
         });
       }
@@ -1409,7 +1505,7 @@ exports.createAppointment = async (req, res) => {
           $lte: appointmentDateEnd,
         },
         status: {
-          $in: ["pending", "accepted", "assigned", "in_progress", "deposited"],
+          $in: ["pending", "assigned", "check_in", "in_progress"],
         },
       })
         .populate("service_type_id")
@@ -1419,8 +1515,8 @@ exports.createAppointment = async (req, res) => {
       const newStart = buildLocalDateTime(appoinment_date, appoinment_time);
       const newEnd = new Date(
         newStart.getTime() +
-        parseDurationToMs(serviceType.estimated_duration) +
-        BUFFER_MS
+          parseDurationToMs(serviceType.estimated_duration) +
+          BUFFER_MS
       );
 
       for (const existingAppt of conflictingAppointments) {
@@ -1443,8 +1539,8 @@ exports.createAppointment = async (req, res) => {
 
         const existingEnd = new Date(
           existingStart.getTime() +
-          parseDurationToMs(existingDurationStr) +
-          BUFFER_MS
+            parseDurationToMs(existingDurationStr) +
+            BUFFER_MS
         );
 
         const overlap =
@@ -1454,7 +1550,8 @@ exports.createAppointment = async (req, res) => {
 
         if (overlap) {
           return res.status(400).json({
-            message: "Technician đã có lịch trùng vào thời gian này. Vui lòng chọn technician khác hoặc để hệ thống tự động phân công.",
+            message:
+              "Technician đã có lịch trùng vào thời gian này. Vui lòng chọn technician khác hoặc để hệ thống tự động phân công.",
             success: false,
           });
         }
@@ -1470,7 +1567,8 @@ exports.createAppointment = async (req, res) => {
 
       if (!selectedTechnician) {
         return res.status(400).json({
-          message: "Không tìm thấy technician khả dụng vào thời gian này. Tất cả technicians đã đủ slot hoặc đang bận.",
+          message:
+            "Không tìm thấy technician khả dụng vào thời gian này. Tất cả technicians đã đủ slot hoặc đang bận.",
           success: false,
         });
       }
@@ -1481,7 +1579,7 @@ exports.createAppointment = async (req, res) => {
       appoinment_date: new Date(appoinment_date),
       appoinment_time,
       notes,
-      estimated_cost: serviceType.base_price || 0,
+      estimated_cost: 2000, // Set estimated_cost ban đầu là 2000
       user_id,
       vehicle_id,
       center_id,
@@ -1493,7 +1591,10 @@ exports.createAppointment = async (req, res) => {
     await appointment.save();
 
     //  Xử lý thanh toán tiền cọc nếu có
-    const paymentResult = await exports.createDepositPayment(userId, appointment._id);
+    const paymentResult = await exports.createDepositPayment(
+      userId,
+      appointment._id
+    );
     if (paymentResult?.success) {
       appointment.payment_id = paymentResult.data.payment_id;
       await appointment.save();
@@ -1505,7 +1606,10 @@ exports.createAppointment = async (req, res) => {
       .populate("center_id", "center_name address phone")
       .populate("vehicle_id", "license_plate vin")
       .populate("technician_id", "username fullName email phone role")
-      .populate("service_type_id", "service_name description base_price estimated_duration")
+      .populate(
+        "service_type_id",
+        "service_name description base_price estimated_duration"
+      )
       .populate(
         "payment_id",
         "order_code orderCode amount status checkout_url checkoutUrl qr_code qrCode"
@@ -1513,13 +1617,13 @@ exports.createAppointment = async (req, res) => {
       .lean();
 
     return res.status(201).json({
-      message: selectedTechnician && !technician_id
-        ? "Tạo appointment thành công. Hệ thống đã tự động phân công technician."
-        : "Tạo appointment thành công",
+      message:
+        selectedTechnician && !technician_id
+          ? "Tạo appointment thành công. Hệ thống đã tự động phân công technician."
+          : "Tạo appointment thành công",
       success: true,
       data: populatedAppointment,
     });
-
   } catch (error) {
     console.error("Create appointment error:", error);
     return res.status(500).json({
@@ -1529,10 +1633,3 @@ exports.createAppointment = async (req, res) => {
     });
   }
 };
-
-
-
-
-
-
-
