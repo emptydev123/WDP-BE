@@ -1415,7 +1415,7 @@ exports.createAppointment = async (req, res) => {
         .populate("service_type_id")
         .lean();
 
-      const BUFFER_MS = 5 * 60 * 1000;
+      const BUFFER_MS = 60 * 1000;
       const newStart = buildLocalDateTime(appoinment_date, appoinment_time);
       const newEnd = new Date(
         newStart.getTime() +

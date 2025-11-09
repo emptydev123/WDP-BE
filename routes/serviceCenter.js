@@ -104,17 +104,23 @@ router.get(
  * @swagger
  * /api/service-center/get:
  *   get:
- *     summary: Lấy danh sách tất cả trung tâm và giờ làm việc theo từng tuần hoặc theo khoảng ngày
+ *     summary: Lấy danh sách tất cả trung tâm và giờ làm việc theo từng tuần, khoảng ngày hoặc ngày cụ thể
  *     tags: [Service Center]
  *     security:
  *       - bearerAuth: []
  *     parameters:
  *       - in: query
+ *         name: date
+ *         schema:
+ *           type: string
+ *           format: date
+ *         description: Ngày cụ thể (YYYY-MM-DD). Ưu tiên cao nhất - chỉ trả về dữ liệu của ngày này. Nếu có date, sẽ bỏ qua start_date/end_date và weeks
+ *       - in: query
  *         name: weeks
  *         schema:
  *           type: integer
  *           default: 4
- *         description: Số tuần muốn lấy (mặc định 4 tuần). Chỉ dùng khi không có start_date và end_date
+ *         description: Số tuần muốn lấy (mặc định 4 tuần). Chỉ dùng khi không có date và start_date/end_date
  *       - in: query
  *         name: center_id
  *         schema:
@@ -125,13 +131,13 @@ router.get(
  *         schema:
  *           type: string
  *           format: date
- *         description: Ngày bắt đầu (YYYY-MM-DD). Phải đi kèm với end_date. Nếu là T7/CN vẫn hiển thị nhưng chỉ có 2 ngày đó
+ *         description: Ngày bắt đầu (YYYY-MM-DD). Phải đi kèm với end_date. Chỉ dùng khi không có date. Nếu là T7/CN vẫn hiển thị nhưng chỉ có 2 ngày đó
  *       - in: query
  *         name: end_date
  *         schema:
  *           type: string
  *           format: date
- *         description: Ngày kết thúc (YYYY-MM-DD). Phải đi kèm với start_date. Nếu là T7/CN vẫn hiển thị nhưng chỉ có 2 ngày đó
+ *         description: Ngày kết thúc (YYYY-MM-DD). Phải đi kèm với start_date. Chỉ dùng khi không có date. Nếu là T7/CN vẫn hiển thị nhưng chỉ có 2 ngày đó
  *     responses:
  *       200:
  *         description: Lấy danh sách trung tâm và giờ làm việc thành công theo từng tuần
@@ -146,6 +152,7 @@ router.get(
  *                 message:
  *                   type: string
  *                   example: "Lấy danh sách trung tâm và giờ làm việc thành công (4 tuần)"
+ *                   description: Message phụ thuộc vào query parameter - "ngày YYYY-MM-DD" nếu có date, "từ YYYY-MM-DD đến YYYY-MM-DD" nếu có start_date/end_date, hoặc "X tuần" nếu dùng weeks
  *                 data:
  *                   type: array
  *                   items:
@@ -230,6 +237,32 @@ router.get(
  *                                     type: number
  *                                     example: 12
  *                                     description: Số slot khả dụng (giống remainingSlots)
+ *                                   timeSlots:
+ *                                     type: array
+ *                                     description: Danh sách các khung giờ có thể đặt (chỉ hiển thị khung giờ đã book hoặc còn trống)
+ *                                     items:
+ *                                       type: object
+ *                                       properties:
+ *                                         time:
+ *                                           type: string
+ *                                           example: "09:00"
+ *                                           description: Khung giờ (HH:mm)
+ *                                         bookedCount:
+ *                                           type: number
+ *                                           example: 1
+ *                                           description: Số lượng booking đã có ở khung giờ này
+ *                                         isFull:
+ *                                           type: boolean
+ *                                           example: true
+ *                                           description: Khung giờ đã đầy chưa
+ *                                         available:
+ *                                           type: number
+ *                                           example: 0
+ *                                           description: Số slot còn trống ở khung giờ này
+ *                                         isBooked:
+ *                                           type: boolean
+ *                                           example: true
+ *                                           description: Khung giờ này đã có booking chưa
  *       401:
  *         description: Unauthorized
  *       500:
