@@ -14,6 +14,10 @@ var cors = require("cors");
 const admin = require("./firebase/firebase");
 const swaggerDocs = require("./swagger/config");
 const bodyParser = require("body-parser");
+
+// Import payment timeout job to check expired payments every 30s
+require("./job/paymentTimeoutJob");
+
 // API only - no view engine needed
 app.use(logger("dev"));
 app.use(express.json());
