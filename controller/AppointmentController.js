@@ -134,11 +134,11 @@ exports.getAppointments = async (req, res) => {
     const pagination = createPagination(validatedPage, validatedLimit, total);
 
     let appointments = await Appointment.find(query)
-      .populate("user_id", "username fullName email phone")
+      .populate("user_id", "username fullName email phoneNumber")
       .populate("center_id", "center_name address phone")
       .populate("vehicle_id", "license_plate vin")
-      .populate("staff_id", "username fullName email phone role")
-      .populate("technician_id", "username fullName email phone role")
+      .populate("staff_id", "username fullName email phoneNumber role")
+      .populate("technician_id", "username fullName email phoneNumber role")
       .populate(
         "payment_id",
         "order_code orderCode amount status checkout_url checkoutUrl qr_code qrCode"
@@ -247,7 +247,7 @@ exports.getTechnicianSchedule = async (req, res) => {
           $in: ["assigned", "check_in", "in_progress", "repaired", "completed"],
         },
       })
-        .populate("user_id", "fullName phone")
+        .populate("user_id", "fullName phoneNumber")
         .populate("vehicle_id", "license_plate brand model")
         .populate("center_id", "center_name address")
         .populate("service_type_id", "service_name estimated_duration")
@@ -265,7 +265,7 @@ exports.getTechnicianSchedule = async (req, res) => {
             _id: technician._id,
             fullName: technician.fullName,
             email: technician.email,
-            phone: technician.phone,
+            phoneNumber: technician.phoneNumber,
           },
           date_range: {
             from: date_from,
@@ -292,7 +292,7 @@ exports.getTechnicianSchedule = async (req, res) => {
     );
 
     const technicians = await User.find({ role: "technician" })
-      .select("_id fullName email phone")
+      .select("_id fullName email phoneNumber")
       .skip(pagination.skip)
       .limit(pagination.limit)
       .lean();
@@ -316,7 +316,7 @@ exports.getTechnicianSchedule = async (req, res) => {
             ],
           },
         })
-          .populate("user_id", "fullName phone")
+          .populate("user_id", "fullName phoneNumber")
           .populate("vehicle_id", "license_plate brand model")
           .populate("center_id", "center_name address")
           .populate("service_type_id", "service_name estimated_duration")
@@ -439,11 +439,11 @@ exports.assignTechnician = async (req, res) => {
     await appointment.save();
 
     const updatedAppointment = await Appointment.findById(appointment_id)
-      .populate("user_id", "username fullName email phone")
-      .populate("center_id", "name address phone")
+      .populate("user_id", "username fullName email phoneNumber")
+      .populate("center_id", "name address phoneNumber")
       .populate("vehicle_id", "license_plate brand model year")
-      .populate("staff_id", "username fullName email phone role")
-      .populate("technician_id", "username fullName email phone role")
+      .populate("staff_id", "username fullName email phoneNumber role")
+      .populate("technician_id", "username fullName email phoneNumber role")
       .populate(
         "payment_id",
         "order_code orderCode amount status checkout_url checkoutUrl qr_code qrCode"
@@ -516,11 +516,11 @@ exports.getMyAppointments = async (req, res) => {
     const pagination = createPagination(validatedPage, validatedLimit, total);
 
     const appointments = await Appointment.find(query)
-      .populate("user_id", "username fullName email phone")
+      .populate("user_id", "username fullName email phoneNumber")
       .populate("center_id", "name address phone")
       .populate("vehicle_id", "license_plate brand model year")
-      .populate("staff_id", "username fullName email phone role")
-      .populate("technician_id", "username fullName email phone role")
+      .populate("staff_id", "username fullName email phoneNumber role")
+      .populate("technician_id", "username fullName email phoneNumber role")
       .populate(
         "payment_id",
         "order_code orderCode amount status checkout_url checkoutUrl qr_code qrCode"
@@ -629,7 +629,7 @@ exports.updateAppointmentStatus = async (req, res) => {
     await appointment.save();
 
     const updatedAppointment = await Appointment.findById(appointment_id)
-      .populate("user_id", "username fullName email phone")
+      .populate("user_id", "username fullName email phoneNumber")
       .populate("center_id", "name address phone")
       .populate("vehicle_id", "license_plate brand model year")
       .lean();
@@ -662,11 +662,11 @@ exports.getAppointmentById = async (req, res) => {
     }
 
     const appointment = await Appointment.findById(appointmentId)
-      .populate("user_id", "username fullName email phone address")
+      .populate("user_id", "username fullName email phoneNumber address")
       .populate("center_id", "name address phone")
       .populate("vehicle_id", "license_plate brand model year color")
-      .populate("staff_id", "username fullName email phone role")
-      .populate("technician_id", "username fullName email phone role")
+      .populate("staff_id", "username fullName email phoneNumber role")
+      .populate("technician_id", "username fullName email phoneNumber role")
       .populate(
         "payment_id",
         "order_code orderCode amount status checkout_url checkoutUrl qr_code qrCode"
@@ -756,11 +756,11 @@ exports.getAppointmentsByUsername = async (req, res) => {
     const pagination = createPagination(validatedPage, validatedLimit, total);
 
     const appointments = await Appointment.find(query)
-      .populate("user_id", "username fullName email phone")
+      .populate("user_id", "username fullName email phoneNumber")
       .populate("center_id", "name address phone")
       .populate("vehicle_id", "license_plate brand model year")
-      .populate("staff_id", "username fullName email phone role")
-      .populate("technician_id", "username fullName email phone role")
+      .populate("staff_id", "username fullName email phoneNumber role")
+      .populate("technician_id", "username fullName email phoneNumber role")
       .populate(
         "payment_id",
         "order_code orderCode amount status checkout_url checkoutUrl qr_code qrCode"
@@ -850,11 +850,11 @@ exports.getAppointmentsByTechnician = async (req, res) => {
     const pagination = createPagination(validatedPage, validatedLimit, total);
 
     const appointments = await Appointment.find(query)
-      .populate("user_id", "username fullName email phone")
+      .populate("user_id", "username fullName email phoneNumber")
       .populate("center_id", "name address phone")
       .populate("vehicle_id", "license_plate brand model year")
-      .populate("staff_id", "username fullName email phone role")
-      .populate("technician_id", "username fullName email phone role")
+      .populate("staff_id", "username fullName email phoneNumber role")
+      .populate("technician_id", "username fullName email phoneNumber role")
       .populate(
         "payment_id",
         "order_code orderCode amount status checkout_url checkoutUrl qr_code qrCode"
@@ -954,7 +954,7 @@ exports.createFinalPayment = async (req, res) => {
 
     const appointment = await Appointment.findById(appointmentId)
       .populate("payment_id")
-      .populate("user_id", "username fullName email");
+      .populate("user_id", "username fullName email phoneNumber");
 
     if (!appointment) {
       return res.status(404).json({
@@ -1040,7 +1040,7 @@ exports.createFinalPayment = async (req, res) => {
       await appointment.save();
 
       const populatedAppointment = await Appointment.findById(appointmentId)
-        .populate("user_id", "username fullName email phone")
+        .populate("user_id", "username fullName email phoneNumber")
         .populate("center_id", "name address phone")
         .populate("vehicle_id", "license_plate brand model year")
 
@@ -1602,10 +1602,10 @@ exports.createAppointment = async (req, res) => {
 
     // Populate thông tin technician đã được assign
     const populatedAppointment = await Appointment.findById(appointment._id)
-      .populate("user_id", "username fullName email phone")
+      .populate("user_id", "username fullName email phoneNumber")
       .populate("center_id", "center_name address phone")
       .populate("vehicle_id", "license_plate vin")
-      .populate("technician_id", "username fullName email phone role")
+      .populate("technician_id", "username fullName email phoneNumber role")
       .populate(
         "service_type_id",
         "service_name description base_price estimated_duration"
