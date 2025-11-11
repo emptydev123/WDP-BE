@@ -141,11 +141,11 @@ exports.getAppointments = async (req, res) => {
       .populate("technician_id", "username fullName email phoneNumber role")
       .populate(
         "payment_id",
-        "order_code orderCode amount status checkout_url checkoutUrl qr_code qrCode"
+        "order_code orderCode amount status checkout_url checkoutUrl qr_code qrCode timeoutAt"
       )
       .populate(
         "final_payment_id",
-        "orderCode amount status checkoutUrl qrCode"
+        "orderCode amount status checkoutUrl qrCode timeoutAt"
       )
       .populate(
         "service_type_id",
@@ -523,11 +523,11 @@ exports.getMyAppointments = async (req, res) => {
       .populate("technician_id", "username fullName email phoneNumber role")
       .populate(
         "payment_id",
-        "order_code orderCode amount status checkout_url checkoutUrl qr_code qrCode"
+        "order_code orderCode amount status checkout_url checkoutUrl qr_code qrCode timeoutAt"
       )
       .populate(
         "final_payment_id",
-        "orderCode amount status checkoutUrl qrCode"
+        "orderCode amount status checkoutUrl qrCode timeoutAt"
       )
       .populate(
         "service_type_id",
@@ -669,11 +669,11 @@ exports.getAppointmentById = async (req, res) => {
       .populate("technician_id", "username fullName email phoneNumber role")
       .populate(
         "payment_id",
-        "order_code orderCode amount status checkout_url checkoutUrl qr_code qrCode"
+        "order_code orderCode amount status checkout_url checkoutUrl qr_code qrCode timeoutAt"
       )
       .populate(
         "final_payment_id",
-        "orderCode amount status checkoutUrl qrCode"
+        "orderCode amount status checkoutUrl qrCode timeoutAt"
       )
       .populate(
         "service_type_id",
@@ -1352,7 +1352,11 @@ exports.createDepositPayment = async (userId, appointmentId) => {
   let paymentResult = null;
   const paymentReq = {
     _id: userId,
-    body: { amount: depositAmount, description },
+    body: { 
+      amount: depositAmount, 
+      description,
+      timeoutSeconds: PAYMENT_EXPIRED_TIME // Truyền timeout từ constant (60 giây)
+    },
   };
   const paymentRes = {
     status: (code) => ({
@@ -1634,7 +1638,7 @@ exports.createAppointment = async (req, res) => {
       )
       .populate(
         "payment_id",
-        "order_code orderCode amount status checkout_url checkoutUrl qr_code qrCode"
+        "order_code orderCode amount status checkout_url checkoutUrl qr_code qrCode timeoutAt"
       )
       .lean();
 

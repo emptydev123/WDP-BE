@@ -320,91 +320,92 @@ router.post(
   appointment.createAppointment
 );
 
-// /**
-//  * @swagger
-//  * /api/appointment/technician-schedule:
-//  *   get:
-//  *     summary: Xem lịch làm việc của technician(s)
-//  *     tags: [Appointments]
-//  *     security:
-//  *       - bearerAuth: []
-//  *     parameters:
-//  *       - in: query
-//  *         name: technician_id
-//  *         required: false
-//  *         schema:
-//  *           type: string
-//  *         description: ID của technician (nếu không có thì lấy tất cả technician)
-//  *       - in: query
-//  *         name: date_from
-//  *         required: true
-//  *         schema:
-//  *           type: string
-//  *           format: date
-//  *         example: "2024-01-01"
-//  *         description: Ngày bắt đầu (YYYY-MM-DD)
-//  *       - in: query
-//  *         name: date_to
-//  *         required: true
-//  *         schema:
-//  *           type: string
-//  *           format: date
-//  *         example: "2024-01-31"
-//  *         description: Ngày kết thúc (YYYY-MM-DD)
-//  *       - in: query
-//  *         name: page
-//  *         schema:
-//  *           type: integer
-//  *           default: 1
-//  *         description: Số trang (chỉ áp dụng khi không có technician_id)
-//  *       - in: query
-//  *         name: limit
-//  *         schema:
-//  *           type: integer
-//  *           default: 10
-//  *         description: Số item per page (chỉ áp dụng khi không có technician_id)
-//  *     responses:
-//  *       200:
-//  *         description: Success
-//  *         content:
-//  *           application/json:
-//  *             schema:
-//  *               type: object
-//  *               properties:
-//  *                 message:
-//  *                   type: string
-//  *                 success:
-//  *                   type: boolean
-//  *                 data:
-//  *                   oneOf:
-//  *                     - type: object
-//  *                       description: Khi có technician_id - chi tiết lịch của 1 technician
-//  *                       properties:
-//  *                         technician:
-//  *                           type: object
-//  *                         date_range:
-//  *                           type: object
-//  *                         schedules:
-//  *                           type: array
-//  *                         total_assignments:
-//  *                           type: number
-//  *                     - type: object
-//  *                       description: Khi không có technician_id - danh sách tất cả technician
-//  *                       properties:
-//  *                         technicians:
-//  *                           type: array
-//  *                         pagination:
-//  *                           type: object
-//  *       400:
-//  *         description: Bad request
-//  *       404:
-//  *         description: Technician not found
-//  */
-// router.get(
-//   "/technician-schedule",
-//   auth.authMiddleWare,
-//   appointment.getTechnicianSchedule
-// );
+ /**
+ * @swagger
+ * /api/appointment/technician-schedule:
+ *   get:
+ *     summary: Xem lịch làm việc của technician(s)
+ *     tags: [Appointments]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: technician_id
+ *         required: false
+ *         schema:
+ *           type: string
+ *         description: ID của technician (nếu không có thì lấy tất cả technician)
+ *       - in: query
+ *         name: date_from
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: date
+ *         example: "2024-01-01"
+ *         description: Ngày bắt đầu (YYYY-MM-DD)
+ *       - in: query
+ *         name: date_to
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: date
+ *         example: "2024-01-31"
+ *         description: Ngày kết thúc (YYYY-MM-DD)
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *         description: Số trang (chỉ áp dụng khi không có technician_id)
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 10
+ *         description: Số item per page (chỉ áp dụng khi không có technician_id)
+ *     responses:
+ *       200:
+ *         description: Success
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                 success:
+ *                   type: boolean
+ *                 data:
+ *                   oneOf:
+ *                     - type: object
+ *                       description: Khi có technician_id - chi tiết lịch của 1 technician
+ *                       properties:
+ *                         technician:
+ *                           type: object
+ *                         date_range:
+ *                           type: object
+ *                         schedules:
+ *                           type: array
+ *                         total_assignments:
+ *                           type: number
+ *                     - type: object
+ *                       description: Khi không có technician_id - danh sách tất cả technician
+ *                       properties:
+ *                         technicians:
+ *                           type: array
+ *                         pagination:
+ *                           type: object
+ *       400:
+ *         description: Bad request
+ *       404:
+ *         description: Technician not found
+ */
+router.get(
+  "/technician-schedule",
+  auth.authMiddleWare,
+  auth.requireRole("customer","staff", "admin", "technician"),
+  appointment.getTechnicianSchedule
+);
 
 /**
  * @swagger
