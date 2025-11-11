@@ -131,7 +131,8 @@ exports.getAllServiceCentersWithHours = async (req, res) => {
             }
         }
 
-        // Kiểm tra xem có start_date và end_date không
+        // Kiểm tra xem có date (ngày cụ thể) không - ưu tiên cao nhất
+        const selectedDate = req.query.date || null;
         const hasDateRange = req.query.start_date && req.query.end_date;
         let weeks = 4;
         let startDate = new Date();
@@ -139,7 +140,14 @@ exports.getAllServiceCentersWithHours = async (req, res) => {
         let endDate = null;
         let dateRange = [];
 
-        if (hasDateRange) {
+        if (selectedDate) {
+            // Nếu có date (ngày cụ thể), chỉ trả về dữ liệu của ngày đó
+            startDate = new Date(selectedDate);
+            startDate.setHours(0, 0, 0, 0);
+            endDate = new Date(selectedDate);
+            endDate.setHours(23, 59, 59, 999);
+            dateRange = [new Date(startDate)];
+        } else if (hasDateRange) {
             // Nếu có start_date và end_date, chỉ gen ra các ngày trong khoảng đó
             startDate = new Date(req.query.start_date);
             startDate.setHours(0, 0, 0, 0);
@@ -180,6 +188,40 @@ exports.getAllServiceCentersWithHours = async (req, res) => {
             return `${year}-${month}-${day}`;
         };
 
+        // Helper function để generate các khung giờ từ open_time đến close_time
+        // Mặc định: 08:00 - 17:00, mỗi khung cách nhau 1 tiếng
+        // Mỗi slot kéo dài 1 giờ, nên khung giờ cuối cùng phải kết thúc trước hoặc bằng close_time
+        const generateTimeSlots = (openTime, closeTime) => {
+            // Nếu không có open_time/close_time, dùng mặc định 08:00 - 17:00
+            const start = openTime || "08:00";
+            const end = closeTime || "17:00";
+
+            const slots = [];
+            const [startHour, startMin] = start.split(':').map(Number);
+            const [endHour, endMin] = end.split(':').map(Number);
+
+            // Chuyển đổi sang phút để dễ so sánh
+            const startMinutes = startHour * 60 + startMin;
+            const endMinutes = endHour * 60 + endMin;
+            const intervalMinutes = 1 * 60; // 1 giờ = 60 phút (mỗi khung cách nhau 1 tiếng)
+            const slotDurationMinutes = 1 * 60; // Mỗi slot kéo dài 1 giờ
+
+            let currentMinutes = startMinutes;
+
+            // Chỉ thêm khung giờ nếu khung đó kết thúc trước hoặc bằng close_time
+            while (currentMinutes + slotDurationMinutes <= endMinutes) {
+                const hour = Math.floor(currentMinutes / 60);
+                const min = currentMinutes % 60;
+                const timeStr = `${String(hour).padStart(2, '0')}:${String(min).padStart(2, '0')}`;
+                slots.push(timeStr);
+
+                currentMinutes += intervalMinutes;
+                if (currentMinutes >= 24 * 60) break; // Vượt quá 24h
+            }
+
+            return slots;
+        };
+
         // Xử lý từng trung tâm
         const result = await Promise.all(
             serviceCenters.map(async (center) => {
@@ -193,7 +235,7 @@ exports.getAllServiceCentersWithHours = async (req, res) => {
 
                 let weeksData = [];
 
-                if (hasDateRange) {
+                if (selectedDate || hasDateRange) {
                     // Trường hợp có start_date và end_date
                     // Lấy tất cả appointments trong khoảng ngày
                     const rangeStartQuery = new Date(startDate);
@@ -286,23 +328,42 @@ exports.getAllServiceCentersWithHours = async (req, res) => {
                                 days: week.days
                                     .sort((a, b) => a.date.localeCompare(b.date))
                                     .map((d) => {
-                                        // Thêm thống kê theo từng khung giờ trong ngày
-                                        const dayAppointments = appointmentsByDate[d.date] || [];
-                                        const byTime = {};
-                                        dayAppointments.forEach((apt) => {
-                                            if (!apt.appoinment_time) return;
-                                            const t = String(apt.appoinment_time).slice(0, 5);
-                                            byTime[t] = (byTime[t] || 0) + 1;
-                                        });
-                                        const timeSlots = Object.keys(byTime)
-                                            .sort()
-                                            .map((t) => {
-                                                const count = byTime[t];
-                                                const capacity = techCount;
-                                                const isFull = capacity <= 0 ? true : count >= capacity;
-                                                const available = Math.max(0, capacity - count);
-                                                return { time: t, bookedCount: count, isFull, available, isBooked: isFull };
+                                        // Lấy template cho ngày này để có open_time và close_time
+                                        const dayTemplate = hoursTemplate[d.day_of_week] || {};
+
+                                        // Nếu ngày đóng cửa hoặc không có technician, trả về timeSlots rỗng
+                                        let timeSlots = [];
+                                        if (!d.is_close && techCount > 0) {
+                                            // Generate tất cả các khung giờ có thể từ open_time đến close_time
+                                            const allPossibleTimeSlots = generateTimeSlots(dayTemplate.open_time, dayTemplate.close_time);
+
+                                            // Nhóm appointments theo khung giờ
+                                            const dayAppointments = appointmentsByDate[d.date] || [];
+                                            const byTime = {};
+                                            dayAppointments.forEach((apt) => {
+                                                if (!apt.appoinment_time) return;
+                                                const t = String(apt.appoinment_time).slice(0, 5);
+                                                byTime[t] = (byTime[t] || 0) + 1;
                                             });
+
+                                            // Tạo timeSlots cho tất cả các khung giờ có thể
+                                            timeSlots = allPossibleTimeSlots
+                                                .map((time) => {
+                                                    const bookedCount = byTime[time] || 0;
+                                                    const capacity = techCount;
+                                                    const isFull = capacity <= 0 ? true : bookedCount >= capacity;
+                                                    const available = Math.max(0, capacity - bookedCount);
+                                                    return {
+                                                        time,
+                                                        bookedCount,
+                                                        isFull,
+                                                        available,
+                                                        isBooked: bookedCount > 0
+                                                    };
+                                                })
+                                                .filter((slot) => slot.isBooked || slot.available > 0); // Hiển thị khung giờ đã book hoặc còn trống
+                                        }
+
                                         return { ...d, timeSlots };
                                     }),
                             };
@@ -356,23 +417,38 @@ exports.getAllServiceCentersWithHours = async (req, res) => {
                             const totalSlots = template.totalSlots || 0;
                             const remainingSlots = Math.max(0, totalSlots - bookedSlots);
 
-                            // Nhóm theo khung giờ
-                            const dayAppointments = appointmentsByDate[dateStr] || [];
-                            const byTime = {};
-                            dayAppointments.forEach((apt) => {
-                                if (!apt.appoinment_time) return;
-                                const t = String(apt.appoinment_time).slice(0, 5);
-                                byTime[t] = (byTime[t] || 0) + 1;
-                            });
-                            const timeSlots = Object.keys(byTime)
-                                .sort()
-                                .map((t) => {
-                                    const count = byTime[t];
-                                    const capacity = techCount;
-                                    const isFull = capacity <= 0 ? true : count >= capacity;
-                                    const available = Math.max(0, capacity - count);
-                                    return { time: t, bookedCount: count, isFull, available, isBooked: isFull };
+                            // Nếu ngày đóng cửa hoặc không có technician, trả về timeSlots rỗng
+                            let timeSlots = [];
+                            if (!template.is_close && techCount > 0) {
+                                // Generate tất cả các khung giờ có thể từ open_time đến close_time
+                                const allPossibleTimeSlots = generateTimeSlots(template.open_time, template.close_time);
+
+                                // Nhóm appointments theo khung giờ
+                                const dayAppointments = appointmentsByDate[dateStr] || [];
+                                const byTime = {};
+                                dayAppointments.forEach((apt) => {
+                                    if (!apt.appoinment_time) return;
+                                    const t = String(apt.appoinment_time).slice(0, 5);
+                                    byTime[t] = (byTime[t] || 0) + 1;
                                 });
+
+                                // Tạo timeSlots cho tất cả các khung giờ có thể
+                                timeSlots = allPossibleTimeSlots
+                                    .map((time) => {
+                                        const bookedCount = byTime[time] || 0;
+                                        const capacity = techCount;
+                                        const isFull = capacity <= 0 ? true : bookedCount >= capacity;
+                                        const available = Math.max(0, capacity - bookedCount);
+                                        return {
+                                            time,
+                                            bookedCount,
+                                            isFull,
+                                            available,
+                                            isBooked: bookedCount > 0
+                                        };
+                                    })
+                                    .filter((slot) => slot.isBooked || slot.available > 0); // Hiển thị khung giờ đã book hoặc còn trống
+                            }
 
                             return {
                                 date: dateStr,
@@ -413,9 +489,14 @@ exports.getAllServiceCentersWithHours = async (req, res) => {
             })
         );
 
-        const message = hasDateRange
-            ? `Lấy danh sách trung tâm và giờ làm việc thành công (từ ${formatDate(startDate)} đến ${formatDate(endDate)})`
-            : `Lấy danh sách trung tâm và giờ làm việc thành công (${weeks} tuần)`;
+        let message = "";
+        if (selectedDate) {
+            message = `Lấy danh sách trung tâm và giờ làm việc thành công (ngày ${formatDate(startDate)})`;
+        } else if (hasDateRange) {
+            message = `Lấy danh sách trung tâm và giờ làm việc thành công (từ ${formatDate(startDate)} đến ${formatDate(endDate)})`;
+        } else {
+            message = `Lấy danh sách trung tâm và giờ làm việc thành công (${weeks} tuần)`;
+        }
 
         return res.status(200).json({
             success: true,
