@@ -139,6 +139,12 @@ router.get("/:partId", auth.authMiddleWare, getPartById);
  *               warranty_month:
  *                 type: number
  *                 description: Bảo hành (tháng)
+ *               costPrice:
+ *                 type: number
+ *                 description: Giá nhập
+ *               sellPrice:
+ *                 type: number
+ *                 description: Giá bán
  *     responses:
  *       201:
  *         description: Part created successfully
@@ -188,6 +194,12 @@ router.post("/", auth.authMiddleWare, createPart);
  *               warranty_month:
  *                 type: number
  *                 description: Bảo hành (tháng)
+ *               costPrice:
+ *                 type: number
+ *                 description: Giá nhập
+ *               sellPrice:
+ *                 type: number
+ *                 description: Giá bán
  *     responses:
  *       200:
  *         description: Part updated successfully

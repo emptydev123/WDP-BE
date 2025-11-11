@@ -115,8 +115,15 @@ exports.getPartById = async (req, res) => {
 // Tạo part mới
 exports.createPart = async (req, res) => {
   try {
-    const { part_number, part_name, description, supplier, warranty_month } =
-      req.body;
+    const {
+      part_number,
+      part_name,
+      description,
+      supplier,
+      warranty_month,
+      costPrice,
+      sellPrice,
+    } = req.body;
     const userId = req._id?.toString();
 
     if (!userId) {
@@ -149,6 +156,8 @@ exports.createPart = async (req, res) => {
       description,
       supplier,
       warranty_month,
+      costPrice,
+      sellPrice,
     });
 
     await part.save();
@@ -172,8 +181,15 @@ exports.createPart = async (req, res) => {
 exports.updatePart = async (req, res) => {
   try {
     const { partId } = req.params;
-    const { part_number, part_name, description, supplier, warranty_month } =
-      req.body;
+    const {
+      part_number,
+      part_name,
+      description,
+      supplier,
+      warranty_month,
+      costPrice,
+      sellPrice,
+    } = req.body;
     const userId = req._id?.toString();
 
     if (!userId) {
@@ -213,6 +229,8 @@ exports.updatePart = async (req, res) => {
     if (description !== undefined) part.description = description;
     if (supplier !== undefined) part.supplier = supplier;
     if (warranty_month !== undefined) part.warranty_month = warranty_month;
+    if (costPrice !== undefined) part.costPrice = costPrice;
+    if (sellPrice !== undefined) part.sellPrice = sellPrice;
 
     await part.save();
 

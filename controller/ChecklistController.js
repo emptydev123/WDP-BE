@@ -13,7 +13,14 @@ const {
 
 exports.getAllChecklists = async (req, res) => {
   try {
-    const { page = 1, limit = 10, appointment_id, technicianId } = req.query;
+    const {
+      page = 1,
+      limit = 10,
+      appointment_id,
+      technicianId,
+      date_from,
+      date_to,
+    } = req.query;
     const userId = req._id?.toString();
 
     if (!userId) {
@@ -29,6 +36,21 @@ exports.getAllChecklists = async (req, res) => {
     );
 
     const filter = {};
+
+    // Lọc theo ngày tháng
+    if (date_from || date_to) {
+      filter.createdAt = {};
+      if (date_from) {
+        const fromDate = new Date(date_from);
+        fromDate.setHours(0, 0, 0, 0);
+        filter.createdAt.$gte = fromDate;
+      }
+      if (date_to) {
+        const toDate = new Date(date_to);
+        toDate.setHours(23, 59, 59, 999);
+        filter.createdAt.$lte = toDate;
+      }
+    }
 
     // Lọc theo technicianId thông qua appointment
     if (technicianId) {
@@ -64,15 +86,61 @@ exports.getAllChecklists = async (req, res) => {
 
     const checklists = await Checklist.find(filter)
       .populate("issue_type_id")
-      .populate("appointment_id", "appoinment_date status technician_id")
-      .populate("parts.part_id")
+      .populate({
+        path: "appointment_id",
+        select:
+          "appoinment_date status technician_id user_id center_id vehicle_id",
+        populate: [
+          {
+            path: "technician_id",
+            select: "fullName username email phoneNumber role",
+          },
+          {
+            path: "user_id",
+            select: "fullName username email phoneNumber role",
+          },
+          { path: "center_id", select: "center_name address phone" },
+          {
+            path: "vehicle_id",
+            select: "license_plate vin color model_id",
+            populate: {
+              path: "model_id",
+              select: "brand model_name",
+            },
+          },
+        ],
+      })
+      .populate("parts.part_id", "part_name part_number sellPrice costPrice")
       .sort({ createdAt: -1 })
       .skip(pagination.skip)
       .limit(pagination.limit)
       .lean();
 
+    // Tính lại total_cost nếu chưa có hoặc cần cập nhật (từ sellPrice của parts)
+    const checklistsWithTotalCost = checklists.map((checklist) => {
+      // Nếu total_cost đã có trong DB thì dùng, nếu không thì tính lại
+      if (checklist.total_cost !== undefined && checklist.total_cost !== null) {
+        return checklist;
+      }
+
+      // Tính lại total_cost từ parts
+      let total_cost = 0;
+      if (checklist.parts && checklist.parts.length > 0) {
+        checklist.parts.forEach((part) => {
+          const partData = part.part_id;
+          const sellPrice = partData?.sellPrice || 0;
+          const quantity = part.quantity || 0;
+          total_cost += sellPrice * quantity;
+        });
+      }
+      return {
+        ...checklist,
+        total_cost: total_cost,
+      };
+    });
+
     const response = createPaginatedResponse(
-      checklists,
+      checklistsWithTotalCost,
       pagination,
       "Lấy danh sách checklist thành công"
     );
@@ -151,6 +219,8 @@ exports.createChecklist = async (req, res) => {
       });
     }
 
+    // Tính total_cost từ parts
+    let total_cost = 0;
     if (parts && parts.length > 0) {
       for (const part of parts) {
         if (!part.part_id || !part.quantity) {
@@ -162,7 +232,9 @@ exports.createChecklist = async (req, res) => {
       }
 
       const partIds = parts.map((p) => p.part_id);
-      const existingParts = await Part.find({ _id: { $in: partIds } });
+      const existingParts = await Part.find({ _id: { $in: partIds } }).select(
+        "sellPrice"
+      );
 
       if (existingParts.length !== partIds.length) {
         return res.status(404).json({
@@ -170,6 +242,15 @@ exports.createChecklist = async (req, res) => {
           success: false,
         });
       }
+
+      // Tính total_cost từ sellPrice của các parts
+      const partsMap = new Map(existingParts.map((p) => [p._id.toString(), p]));
+      parts.forEach((part) => {
+        const partData = partsMap.get(part.part_id.toString());
+        if (partData && partData.sellPrice) {
+          total_cost += partData.sellPrice * part.quantity;
+        }
+      });
     }
 
     const checklist = new Checklist({
@@ -179,6 +260,7 @@ exports.createChecklist = async (req, res) => {
       solution_applied,
       parts: parts || [],
       status: "pending", // Tech tạo checklist với status pending
+      total_cost: total_cost,
     });
 
     await checklist.save();
@@ -280,7 +362,7 @@ exports.acceptChecklist = async (req, res) => {
         center_id: appointment.center_id,
       }).populate(
         "part_id",
-        "part_name description part_number supplier warranty_month"
+        "part_name description part_number supplier warranty_month costPrice sellPrice"
       );
 
       if (!inventory) {
@@ -290,16 +372,17 @@ exports.acceptChecklist = async (req, res) => {
         });
       }
 
-      // Lấy giá từ inventory.cost_per_unit
-      const unitCost = inventory.cost_per_unit || 0;
+      // Lấy giá từ part.sellPrice
+      const partData = inventory.part_id;
+      const unitCost = partData?.sellPrice || 0;
 
       if (!unitCost || unitCost <= 0) {
         console.error(
-          `Inventory cho part ${partId} không có giá hợp lệ (cost_per_unit):`,
-          inventory
+          `Part ${partId} không có giá hợp lệ (sellPrice):`,
+          partData
         );
         return res.status(400).json({
-          message: `Inventory cho part ${partId} không có giá (cost_per_unit)`,
+          message: `Part ${partId} không có giá (sellPrice)`,
           success: false,
         });
       }
@@ -315,12 +398,12 @@ exports.acceptChecklist = async (req, res) => {
         });
       }
 
-      // Tính cost từ inventory.cost_per_unit
+      // Tính cost từ part.sellPrice
       const partCost = unitCost * part.quantity;
       totalCost += partCost;
 
       console.log(
-        `Part ${partId}: ${unitCost} × ${part.quantity} = ${partCost} (từ inventory.cost_per_unit)`
+        `Part ${partId}: ${unitCost} × ${part.quantity} = ${partCost} (từ part.sellPrice)`
       );
 
       // Lưu lại để cập nhật inventory sau
