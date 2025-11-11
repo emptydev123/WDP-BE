@@ -29,7 +29,7 @@ app.use(express.static(path.join(__dirname, "public")));
 app.use(
   cors({
     origin: "*", // Cho phép tất cả origins
-    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
   })
 );
