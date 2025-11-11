@@ -40,9 +40,43 @@ const { authMiddleWare } = require("../middlewares/auth");
  *         schema:
  *           type: string
  *         description: Lọc theo technician ID (lọc checklist của technician này thông qua appointment)
+ *       - in: query
+ *         name: date_from
+ *         schema:
+ *           type: string
+ *           format: date
+ *         description: Lọc từ ngày (YYYY-MM-DD)
+ *       - in: query
+ *         name: date_to
+ *         schema:
+ *           type: string
+ *           format: date
+ *         description: Lọc đến ngày (YYYY-MM-DD)
  *     responses:
  *       200:
  *         description: Success
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                 success:
+ *                   type: boolean
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     items:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           total_cost:
+ *                             type: number
+ *                             description: Tổng chi phí (tổng sellPrice * quantity của tất cả parts)
+ *                     pagination:
+ *                       type: object
  *       401:
  *         description: Unauthorized
  */

@@ -134,11 +134,11 @@ exports.getAppointments = async (req, res) => {
     const pagination = createPagination(validatedPage, validatedLimit, total);
 
     let appointments = await Appointment.find(query)
-      .populate("user_id", "username fullName email phone")
+      .populate("user_id", "username fullName email phoneNumber")
       .populate("center_id", "center_name address phone")
       .populate("vehicle_id", "license_plate vin")
-      .populate("staff_id", "username fullName email phone role")
-      .populate("technician_id", "username fullName email phone role")
+      .populate("staff_id", "username fullName email phoneNumber role")
+      .populate("technician_id", "username fullName email phoneNumber role")
       .populate(
         "payment_id",
         "order_code orderCode amount status checkout_url checkoutUrl qr_code qrCode timeoutAt"
@@ -247,7 +247,7 @@ exports.getTechnicianSchedule = async (req, res) => {
           $in: ["assigned", "check_in", "in_progress", "repaired", "completed"],
         },
       })
-        .populate("user_id", "fullName phone")
+        .populate("user_id", "fullName phoneNumber")
         .populate("vehicle_id", "license_plate brand model")
         .populate("center_id", "center_name address")
         .populate("service_type_id", "service_name estimated_duration")
@@ -265,7 +265,7 @@ exports.getTechnicianSchedule = async (req, res) => {
             _id: technician._id,
             fullName: technician.fullName,
             email: technician.email,
-            phone: technician.phone,
+            phoneNumber: technician.phoneNumber,
           },
           date_range: {
             from: date_from,
@@ -292,7 +292,7 @@ exports.getTechnicianSchedule = async (req, res) => {
     );
 
     const technicians = await User.find({ role: "technician" })
-      .select("_id fullName email phone")
+      .select("_id fullName email phoneNumber")
       .skip(pagination.skip)
       .limit(pagination.limit)
       .lean();
@@ -316,7 +316,7 @@ exports.getTechnicianSchedule = async (req, res) => {
             ],
           },
         })
-          .populate("user_id", "fullName phone")
+          .populate("user_id", "fullName phoneNumber")
           .populate("vehicle_id", "license_plate brand model")
           .populate("center_id", "center_name address")
           .populate("service_type_id", "service_name estimated_duration")
@@ -439,11 +439,11 @@ exports.assignTechnician = async (req, res) => {
     await appointment.save();
 
     const updatedAppointment = await Appointment.findById(appointment_id)
-      .populate("user_id", "username fullName email phone")
-      .populate("center_id", "name address phone")
+      .populate("user_id", "username fullName email phoneNumber")
+      .populate("center_id", "name address phoneNumber")
       .populate("vehicle_id", "license_plate brand model year")
-      .populate("staff_id", "username fullName email phone role")
-      .populate("technician_id", "username fullName email phone role")
+      .populate("staff_id", "username fullName email phoneNumber role")
+      .populate("technician_id", "username fullName email phoneNumber role")
       .populate(
         "payment_id",
         "order_code orderCode amount status checkout_url checkoutUrl qr_code qrCode"
@@ -516,11 +516,11 @@ exports.getMyAppointments = async (req, res) => {
     const pagination = createPagination(validatedPage, validatedLimit, total);
 
     const appointments = await Appointment.find(query)
-      .populate("user_id", "username fullName email phone")
+      .populate("user_id", "username fullName email phoneNumber")
       .populate("center_id", "name address phone")
       .populate("vehicle_id", "license_plate brand model year")
-      .populate("staff_id", "username fullName email phone role")
-      .populate("technician_id", "username fullName email phone role")
+      .populate("staff_id", "username fullName email phoneNumber role")
+      .populate("technician_id", "username fullName email phoneNumber role")
       .populate(
         "payment_id",
         "order_code orderCode amount status checkout_url checkoutUrl qr_code qrCode timeoutAt"
@@ -629,7 +629,7 @@ exports.updateAppointmentStatus = async (req, res) => {
     await appointment.save();
 
     const updatedAppointment = await Appointment.findById(appointment_id)
-      .populate("user_id", "username fullName email phone")
+      .populate("user_id", "username fullName email phoneNumber")
       .populate("center_id", "name address phone")
       .populate("vehicle_id", "license_plate brand model year")
       .lean();
@@ -662,11 +662,11 @@ exports.getAppointmentById = async (req, res) => {
     }
 
     const appointment = await Appointment.findById(appointmentId)
-      .populate("user_id", "username fullName email phone address")
+      .populate("user_id", "username fullName email phoneNumber address")
       .populate("center_id", "name address phone")
       .populate("vehicle_id", "license_plate brand model year color")
-      .populate("staff_id", "username fullName email phone role")
-      .populate("technician_id", "username fullName email phone role")
+      .populate("staff_id", "username fullName email phoneNumber role")
+      .populate("technician_id", "username fullName email phoneNumber role")
       .populate(
         "payment_id",
         "order_code orderCode amount status checkout_url checkoutUrl qr_code qrCode timeoutAt"
@@ -756,11 +756,11 @@ exports.getAppointmentsByUsername = async (req, res) => {
     const pagination = createPagination(validatedPage, validatedLimit, total);
 
     const appointments = await Appointment.find(query)
-      .populate("user_id", "username fullName email phone")
+      .populate("user_id", "username fullName email phoneNumber")
       .populate("center_id", "name address phone")
       .populate("vehicle_id", "license_plate brand model year")
-      .populate("staff_id", "username fullName email phone role")
-      .populate("technician_id", "username fullName email phone role")
+      .populate("staff_id", "username fullName email phoneNumber role")
+      .populate("technician_id", "username fullName email phoneNumber role")
       .populate(
         "payment_id",
         "order_code orderCode amount status checkout_url checkoutUrl qr_code qrCode"
@@ -850,11 +850,11 @@ exports.getAppointmentsByTechnician = async (req, res) => {
     const pagination = createPagination(validatedPage, validatedLimit, total);
 
     const appointments = await Appointment.find(query)
-      .populate("user_id", "username fullName email phone")
+      .populate("user_id", "username fullName email phoneNumber")
       .populate("center_id", "name address phone")
       .populate("vehicle_id", "license_plate brand model year")
-      .populate("staff_id", "username fullName email phone role")
-      .populate("technician_id", "username fullName email phone role")
+      .populate("staff_id", "username fullName email phoneNumber role")
+      .populate("technician_id", "username fullName email phoneNumber role")
       .populate(
         "payment_id",
         "order_code orderCode amount status checkout_url checkoutUrl qr_code qrCode"
@@ -954,7 +954,7 @@ exports.createFinalPayment = async (req, res) => {
 
     const appointment = await Appointment.findById(appointmentId)
       .populate("payment_id")
-      .populate("user_id", "username fullName email");
+      .populate("user_id", "username fullName email phoneNumber");
 
     if (!appointment) {
       return res.status(404).json({
@@ -1040,7 +1040,7 @@ exports.createFinalPayment = async (req, res) => {
       await appointment.save();
 
       const populatedAppointment = await Appointment.findById(appointmentId)
-        .populate("user_id", "username fullName email phone")
+        .populate("user_id", "username fullName email phoneNumber")
         .populate("center_id", "name address phone")
         .populate("vehicle_id", "license_plate brand model year")
 
@@ -1082,26 +1082,46 @@ exports.validateAppointmentRules = async ({
   serviceType,
   existingAppointments,
 }) => {
+  // Helper to safely extract id string from populated or ObjectId/null
+  const getIdString = (ref) => {
+    if (!ref) return null;
+    if (typeof ref === "string") return ref;
+    if (ref._id) return ref._id.toString();
+    if (typeof ref.toString === "function") return ref.toString();
+    return null;
+  };
+  const getDateOnlyString = (d) => {
+    if (!d) return null;
+    if (d instanceof Date) return d.toISOString().split("T")[0];
+    // if stored as string 'YYYY-MM-DD'
+    if (typeof d === "string") return d.split("T")[0];
+    return null;
+  };
+
   const BUFFER_MS = 5 * 60 * 1000;
   const newStart = buildLocalDateTime(appoinment_date, appoinment_time);
   const newEnd = new Date(
     newStart.getTime() +
-      parseDurationToMs(serviceType.estimated_duration) +
-      BUFFER_MS
+    parseDurationToMs(serviceType.estimated_duration) +
+    BUFFER_MS
   );
 
-  const activeStatuses = ["pending", "in_progress"];
+  const activeStatuses = [
+    "pending",
+    "in_progress",
+
+  ];
   const finishedStatuses = ["completed", "cancelled"];
 
   // Check trùng hoàn toàn
   const exactSame = existingAppointments.find(
     (a) =>
-      a.center_id._id.toString() === center_id &&
-      a.vehicle_id._id.toString() === vehicle_id &&
-      a.service_type_id._id.toString() === service_type_id &&
-      a.appoinment_date.toISOString().split("T")[0] === appoinment_date &&
-      a.appoinment_time === appoinment_time &&
-      !finishedStatuses.includes(a.status)
+      getIdString(a?.center_id) === center_id &&
+      getIdString(a?.vehicle_id) === vehicle_id &&
+      getIdString(a?.service_type_id) === service_type_id &&
+      getDateOnlyString(a?.appoinment_date) === appoinment_date &&
+      a?.appoinment_time === appoinment_time &&
+      !finishedStatuses.includes(a?.status)
   );
   if (exactSame) {
     return "Đã tồn tại lịch hẹn trùng hoàn toàn (trung tâm, xe, dịch vụ, ngày, giờ).";
@@ -1109,11 +1129,11 @@ exports.validateAppointmentRules = async ({
 
   const sameCombo = existingAppointments.filter(
     (a) =>
-      a.center_id._id.toString() === center_id &&
-      a.vehicle_id._id.toString() === vehicle_id &&
-      a.service_type_id._id.toString() === service_type_id &&
-      a.appoinment_date.toISOString().split("T")[0] === appoinment_date &&
-      activeStatuses.includes(a.status)
+      getIdString(a?.center_id) === center_id &&
+      getIdString(a?.vehicle_id) === vehicle_id &&
+      getIdString(a?.service_type_id) === service_type_id &&
+      getDateOnlyString(a?.appoinment_date) === appoinment_date &&
+      activeStatuses.includes(a?.status)
   );
   if (sameCombo.length >= 2) {
     return "Bạn chỉ có thể tạo tối đa 2 lịch đang hoạt động (pending/in_progress) cho cùng trung tâm, xe và dịch vụ.";
@@ -1121,34 +1141,36 @@ exports.validateAppointmentRules = async ({
 
   const sameTimeConflict = existingAppointments.find(
     (a) =>
-      a.appoinment_date.toISOString().split("T")[0] === appoinment_date &&
-      a.appoinment_time === appoinment_time &&
-      a.vehicle_id._id.toString() === vehicle_id &&
-      a.center_id._id.toString() !== center_id &&
-      !finishedStatuses.includes(a.status)
+      getDateOnlyString(a?.appoinment_date) === appoinment_date &&
+      a?.appoinment_time === appoinment_time &&
+      getIdString(a?.vehicle_id) === vehicle_id &&
+      getIdString(a?.center_id) !== null &&
+      getIdString(a?.center_id) !== center_id &&
+      !finishedStatuses.includes(a?.status)
   );
   if (sameTimeConflict) {
     return "Xe này đã có lịch ở trung tâm khác tại cùng thời điểm.";
   }
 
   const overlapAppointment = existingAppointments.find((a) => {
-    if (a.vehicle_id._id.toString() !== vehicle_id) return false;
+    if (getIdString(a?.vehicle_id) !== vehicle_id) return false;
 
-    const existingDateStr = a.appoinment_date.toISOString().split("T")[0];
+    const existingDateStr = getDateOnlyString(a?.appoinment_date);
     if (existingDateStr !== appoinment_date) return false;
 
     const existingDurationStr =
-      (a.service_type_id && a.service_type_id.estimated_duration) ||
-      a.estimated_duration;
+      (a?.service_type_id && a.service_type_id?.estimated_duration) ||
+      a?.estimated_duration ||
+      "0";
 
     const existingStart = buildLocalDateTime(
       existingDateStr,
-      a.appoinment_time
+      a?.appoinment_time
     );
     const existingEnd = new Date(
       existingStart.getTime() +
-        parseDurationToMs(existingDurationStr) +
-        BUFFER_MS
+      parseDurationToMs(existingDurationStr) +
+      BUFFER_MS
     );
 
     const overlap =
@@ -1156,7 +1178,7 @@ exports.validateAppointmentRules = async ({
       (newEnd > existingStart && newEnd <= existingEnd) ||
       (newStart <= existingStart && newEnd >= existingEnd);
 
-    return overlap && !finishedStatuses.includes(a.status);
+    return overlap && !finishedStatuses.includes(a?.status);
   });
   if (overlapAppointment)
     return "Xe này đã có lịch trong khoảng thời gian này (bao gồm thời lượng dịch vụ).";
@@ -1243,8 +1265,8 @@ exports.autoAssignTechnician = async ({
       const newStart = buildLocalDateTime(appoinment_date, appoinment_time);
       const newEnd = new Date(
         newStart.getTime() +
-          parseDurationToMs(serviceType.estimated_duration) +
-          BUFFER_MS
+        parseDurationToMs(serviceType.estimated_duration) +
+        BUFFER_MS
       );
 
       for (const existingAppt of conflictingAppointments) {
@@ -1267,8 +1289,8 @@ exports.autoAssignTechnician = async ({
 
         const existingEnd = new Date(
           existingStart.getTime() +
-            parseDurationToMs(existingDurationStr) +
-            BUFFER_MS
+          parseDurationToMs(existingDurationStr) +
+          BUFFER_MS
         );
 
         // Check overlap
@@ -1519,8 +1541,8 @@ exports.createAppointment = async (req, res) => {
       const newStart = buildLocalDateTime(appoinment_date, appoinment_time);
       const newEnd = new Date(
         newStart.getTime() +
-          parseDurationToMs(serviceType.estimated_duration) +
-          BUFFER_MS
+        parseDurationToMs(serviceType.estimated_duration) +
+        BUFFER_MS
       );
 
       for (const existingAppt of conflictingAppointments) {
@@ -1543,8 +1565,8 @@ exports.createAppointment = async (req, res) => {
 
         const existingEnd = new Date(
           existingStart.getTime() +
-            parseDurationToMs(existingDurationStr) +
-            BUFFER_MS
+          parseDurationToMs(existingDurationStr) +
+          BUFFER_MS
         );
 
         const overlap =
@@ -1606,10 +1628,10 @@ exports.createAppointment = async (req, res) => {
 
     // Populate thông tin technician đã được assign
     const populatedAppointment = await Appointment.findById(appointment._id)
-      .populate("user_id", "username fullName email phone")
+      .populate("user_id", "username fullName email phoneNumber")
       .populate("center_id", "center_name address phone")
       .populate("vehicle_id", "license_plate vin")
-      .populate("technician_id", "username fullName email phone role")
+      .populate("technician_id", "username fullName email phoneNumber role")
       .populate(
         "service_type_id",
         "service_name description base_price estimated_duration"

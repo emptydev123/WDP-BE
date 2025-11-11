@@ -54,7 +54,7 @@ exports.getAllInventory = async (req, res) => {
     const inventory = await Inventory.find(query)
       .populate(
         "part_id",
-        "part_name description part_number supplier warranty_month"
+        "part_name description part_number supplier warranty_month costPrice sellPrice"
       )
       .populate("center_id", "center_name address phone")
       .sort({ updatedAt: -1 })
@@ -101,7 +101,7 @@ exports.getInventoryById = async (req, res) => {
     const inventory = await Inventory.findById(inventoryId)
       .populate(
         "part_id",
-        "part_name description part_number supplier warranty_month"
+        "part_name description part_number supplier warranty_month costPrice sellPrice"
       )
       .populate("center_id", "center_name address phone");
 
@@ -130,13 +130,7 @@ exports.getInventoryById = async (req, res) => {
 // Tạo inventory mới
 exports.createInventory = async (req, res) => {
   try {
-    const {
-      quantity_avaiable,
-      minimum_stock,
-      cost_per_unit,
-      center_id,
-      part_id,
-    } = req.body;
+    const { quantity_avaiable, minimum_stock, center_id, part_id } = req.body;
     const userId = req._id?.toString();
 
     if (!userId) {
@@ -184,7 +178,6 @@ exports.createInventory = async (req, res) => {
     const inventory = new Inventory({
       quantity_avaiable,
       minimum_stock: minimum_stock || 0,
-      cost_per_unit,
       center_id,
       part_id,
       last_restocked: new Date(),
@@ -195,7 +188,7 @@ exports.createInventory = async (req, res) => {
     const populatedInventory = await Inventory.findById(inventory._id)
       .populate(
         "part_id",
-        "part_name description part_number supplier warranty_month"
+        "part_name description part_number supplier warranty_month costPrice sellPrice"
       )
       .populate("center_id", "center_name address phone");
 
@@ -218,8 +211,7 @@ exports.createInventory = async (req, res) => {
 exports.updateInventory = async (req, res) => {
   try {
     const { inventoryId } = req.params;
-    const { quantity_avaiable, minimum_stock, cost_per_unit, last_restocked } =
-      req.body;
+    const { quantity_avaiable, minimum_stock, last_restocked } = req.body;
     const userId = req._id?.toString();
 
     if (!userId) {
@@ -248,7 +240,6 @@ exports.updateInventory = async (req, res) => {
     if (quantity_avaiable !== undefined)
       updateData.quantity_avaiable = quantity_avaiable;
     if (minimum_stock !== undefined) updateData.minimum_stock = minimum_stock;
-    if (cost_per_unit !== undefined) updateData.cost_per_unit = cost_per_unit;
     if (last_restocked !== undefined)
       updateData.last_restocked = new Date(last_restocked);
 
@@ -259,7 +250,7 @@ exports.updateInventory = async (req, res) => {
     )
       .populate(
         "part_id",
-        "part_name description part_number supplier warranty_month"
+        "part_name description part_number supplier warranty_month costPrice sellPrice"
       )
       .populate("center_id", "center_name address phone");
 

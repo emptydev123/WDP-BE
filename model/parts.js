@@ -17,6 +17,14 @@ const partSchema = new schema(
     warranty_month: {
       type: Number,
     },
+    costPrice: {
+      type: Number,
+      required: false,
+    },
+    sellPrice: {
+      type: Number,
+      required: false,
+    },
   },
   { timestamps: true }
 );

@@ -142,9 +142,6 @@ router.get("/:inventoryId", auth.authMiddleWare, getInventoryById);
  *               minimum_stock:
  *                 type: number
  *                 description: Số lượng tồn kho tối thiểu
- *               cost_per_unit:
- *                 type: number
- *                 description: Giá mỗi đơn vị
  *               center_id:
  *                 type: string
  *                 description: Service center ID
@@ -202,9 +199,6 @@ router.post("/", auth.authMiddleWare, createInventory);
  *               minimum_stock:
  *                 type: number
  *                 description: Số lượng tồn kho tối thiểu
- *               cost_per_unit:
- *                 type: number
- *                 description: Giá mỗi đơn vị
  *               last_restocked:
  *                 type: string
  *                 format: date

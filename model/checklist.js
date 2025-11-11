@@ -44,6 +44,10 @@ const checklistSchema = new schema(
       type: String,
       required: false,
     },
+    total_cost: {
+      type: Number,
+      default: 0,
+    },
   },
   { timestamps: true }
 );
