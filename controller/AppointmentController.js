@@ -1108,12 +1108,10 @@ exports.validateAppointmentRules = async ({
 
   const activeStatuses = [
     "pending",
-    "assigned",
-    "check_in",
     "in_progress",
-    "repaired",
+
   ];
-  const finishedStatuses = ["completed", "canceled", "cancelled"];
+  const finishedStatuses = ["completed", "cancelled"];
 
   // Check trùng hoàn toàn
   const exactSame = existingAppointments.find(
