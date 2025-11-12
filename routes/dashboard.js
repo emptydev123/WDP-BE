@@ -51,9 +51,9 @@ router.get(
 
 /**
  * @swagger
- * /api/dashboard/revenue:
+ * /api/dashboard/top-brands:
  *   get:
- *     summary: Doanh thu từ Payments (PAID)
+ *     summary: Top 5 hãng xe sửa nhiều nhất (mặc định 3 tuần, có thể filter theo thời gian)
  *     tags: [Dashboard]
  *     security:
  *       - bearerAuth: []
@@ -63,67 +63,13 @@ router.get(
  *         schema:
  *           type: string
  *           format: date
- *         description: Ngày bắt đầu (YYYY-MM-DD)
+ *         description: Ngày bắt đầu (YYYY-MM-DD). Nếu không có, mặc định là 3 tuần trước
  *       - in: query
  *         name: date_to
  *         schema:
  *           type: string
  *           format: date
- *         description: Ngày kết thúc (YYYY-MM-DD)
- *     responses:
- *       200:
- *         description: Doanh thu thành công
- */
-router.get("/revenue", authMiddleWare, DashboardController.getRevenue);
-
-/**
- * @swagger
- * /api/dashboard/payment-rate:
- *   get:
- *     summary: Tỉ lệ thanh toán
- *     tags: [Dashboard]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: query
- *         name: date_from
- *         schema:
- *           type: string
- *           format: date
- *         description: Ngày bắt đầu (YYYY-MM-DD)
- *       - in: query
- *         name: date_to
- *         schema:
- *           type: string
- *           format: date
- *         description: Ngày kết thúc (YYYY-MM-DD)
- *     responses:
- *       200:
- *         description: Tỉ lệ thanh toán thành công
- */
-router.get("/payment-rate", authMiddleWare, DashboardController.getPaymentRate);
-
-/**
- * @swagger
- * /api/dashboard/appointment-rate:
- *   get:
- *     summary: Tỉ lệ của appointment (theo status)
- *     tags: [Dashboard]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: query
- *         name: date_from
- *         schema:
- *           type: string
- *           format: date
- *         description: Ngày bắt đầu (YYYY-MM-DD)
- *       - in: query
- *         name: date_to
- *         schema:
- *           type: string
- *           format: date
- *         description: Ngày kết thúc (YYYY-MM-DD)
+ *         description: Ngày kết thúc (YYYY-MM-DD). Nếu không có, mặc định là hôm nay
  *       - in: query
  *         name: center_id
  *         schema:
@@ -131,57 +77,7 @@ router.get("/payment-rate", authMiddleWare, DashboardController.getPaymentRate);
  *         description: Lọc theo Service Center ID
  *     responses:
  *       200:
- *         description: Tỉ lệ appointment thành công
- */
-router.get(
-  "/appointment-rate",
-  authMiddleWare,
-  DashboardController.getAppointmentRate
-);
-
-/**
- * @swagger
- * /api/dashboard/checkin-rate:
- *   get:
- *     summary: Tỷ lệ check-in
- *     tags: [Dashboard]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: query
- *         name: date_from
- *         schema:
- *           type: string
- *           format: date
- *         description: Ngày bắt đầu (YYYY-MM-DD)
- *       - in: query
- *         name: date_to
- *         schema:
- *           type: string
- *           format: date
- *         description: Ngày kết thúc (YYYY-MM-DD)
- *       - in: query
- *         name: appointment_id
- *         schema:
- *           type: string
- *         description: Lọc theo appointment ID
- *     responses:
- *       200:
- *         description: Tỷ lệ check-in thành công
- */
-router.get("/checkin-rate", authMiddleWare, DashboardController.getCheckinRate);
-
-/**
- * @swagger
- * /api/dashboard/top-brands:
- *   get:
- *     summary: Hãng xe nào sửa nhiều nhất trong 3 tuần
- *     tags: [Dashboard]
- *     security:
- *       - bearerAuth: []
- *     responses:
- *       200:
- *         description: Danh sách hãng xe sửa nhiều nhất
+ *         description: Top 5 hãng xe sửa nhiều nhất
  */
 router.get(
   "/top-brands",
@@ -193,13 +89,31 @@ router.get(
  * @swagger
  * /api/dashboard/top-parts:
  *   get:
- *     summary: Phụ tùng nào thay nhiều nhất trong tháng
+ *     summary: Top 5 phụ tùng thay nhiều nhất (mặc định tháng này, có thể filter theo thời gian)
  *     tags: [Dashboard]
  *     security:
  *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: date_from
+ *         schema:
+ *           type: string
+ *           format: date
+ *         description: Ngày bắt đầu (YYYY-MM-DD). Nếu không có, mặc định là đầu tháng này
+ *       - in: query
+ *         name: date_to
+ *         schema:
+ *           type: string
+ *           format: date
+ *         description: Ngày kết thúc (YYYY-MM-DD). Nếu không có, mặc định là hôm nay
+ *       - in: query
+ *         name: center_id
+ *         schema:
+ *           type: string
+ *         description: Lọc theo Service Center ID
  *     responses:
  *       200:
- *         description: Danh sách phụ tùng thay nhiều nhất
+ *         description: Top 5 phụ tùng thay nhiều nhất
  */
 router.get(
   "/top-parts",
@@ -211,13 +125,31 @@ router.get(
  * @swagger
  * /api/dashboard/top-technicians-appointments:
  *   get:
- *     summary: Nhân viên có nhiều appointment nhất
+ *     summary: Top 5 nhân viên có nhiều appointment nhất (mặc định 30 ngày, có thể filter theo thời gian)
  *     tags: [Dashboard]
  *     security:
  *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: date_from
+ *         schema:
+ *           type: string
+ *           format: date
+ *         description: Ngày bắt đầu (YYYY-MM-DD). Nếu không có, mặc định là 30 ngày trước
+ *       - in: query
+ *         name: date_to
+ *         schema:
+ *           type: string
+ *           format: date
+ *         description: Ngày kết thúc (YYYY-MM-DD). Nếu không có, mặc định là hôm nay
+ *       - in: query
+ *         name: center_id
+ *         schema:
+ *           type: string
+ *         description: Lọc theo Service Center ID
  *     responses:
  *       200:
- *         description: Danh sách nhân viên có nhiều appointment nhất
+ *         description: Top 5 nhân viên có nhiều appointment nhất
  */
 router.get(
   "/top-technicians-appointments",
@@ -229,10 +161,28 @@ router.get(
  * @swagger
  * /api/dashboard/top-technicians-revenue:
  *   get:
- *     summary: Nhân viên kiếm nhiều tiền nhất
+ *     summary: Top 5 nhân viên kiếm nhiều tiền nhất (mặc định 30 ngày, có thể filter theo thời gian)
  *     tags: [Dashboard]
  *     security:
  *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: date_from
+ *         schema:
+ *           type: string
+ *           format: date
+ *         description: Ngày bắt đầu (YYYY-MM-DD). Nếu không có, mặc định là 30 ngày trước
+ *       - in: query
+ *         name: date_to
+ *         schema:
+ *           type: string
+ *           format: date
+ *         description: Ngày kết thúc (YYYY-MM-DD). Nếu không có, mặc định là hôm nay
+ *       - in: query
+ *         name: center_id
+ *         schema:
+ *           type: string
+ *         description: Lọc theo Service Center ID
  *     responses:
  *       200:
  *         description: Danh sách nhân viên kiếm nhiều tiền nhất
