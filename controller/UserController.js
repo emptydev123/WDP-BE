@@ -7,6 +7,9 @@ const nodemailer = require("nodemailer");
 const { v4: uuidv4 } = require("uuid");
 const { cacheGet, cacheSet, cacheDel } = require("../services/redis");
 const crypto = require("crypto");
+const multer = require("multer");
+const path = require("path");
+const fs = require("fs");
 const {
   createPagination,
   createPaginatedResponse,
@@ -44,9 +47,10 @@ exports.registerUser = async (req, res) => {
     };
     const newUser = await new User(payload).save();
 
-    // BUST CACHE sau khi ghi
+    // BUST CACHE sau khi ghi (clear both old and new cache keys)
     await cacheDel("users:all");
     await cacheDel(`users:${newUser._id}`);
+    await cacheDel(`users:v2:${newUser._id}`);
 
     return res.status(201).json({
       message: "User register successfully",
@@ -117,13 +121,14 @@ exports.getProfileUser = async (req, res) => {
   const userId = req._id?.toString();
   if (!userId) return res.status(401).json({ message: "Unauthorized" });
 
-  const key = `users:${userId}`;
+  // Add version to cache key to invalidate old cache without avatar field
+  const key = `users:v2:${userId}`;
   try {
     const cached = await cacheGet(key);
     if (cached) return res.status(200).json({ user: cached });
 
     const user = await User.findById(userId)
-      .select("-password -verifyToken -verifyTokenExpires")
+      .select("-password -verifyToken -verifyTokenExpires -resetToken -resetTokenExpires")
       .lean();
     if (!user) return res.status(404).json({ message: "Not found profile" });
 
@@ -217,6 +222,7 @@ exports.loginGoogle = async (req, res) => {
     if (isNew) {
       await cacheDel("users:all");
       await cacheDel(`users:${user._id}`);
+      await cacheDel(`users:v2:${user._id}`);
     }
 
     return res.status(201).json({
@@ -299,5 +305,140 @@ exports.resetPassword = async (req, res) => {
     return res.status(200).json({ message: "Đặt lại mật khẩu thành công." });
   } catch (err) {
     res.status(500).json({ message: "Lỗi server", error: err.message });
+  }
+};
+
+// Ensure directory exists
+const ensureDir = (dir) => {
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+};
+
+// Configure multer for avatar upload
+const avatarStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const uploadDir = path.join(__dirname, '..', 'public', 'uploads', 'avatars');
+    ensureDir(uploadDir);
+    cb(null, uploadDir);
+  },
+  filename: (req, file, cb) => {
+    const uniqueName = `${Date.now()}-${uuidv4()}${path.extname(file.originalname)}`;
+    cb(null, uniqueName);
+  }
+});
+
+const avatarUpload = multer({
+  storage: avatarStorage,
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = /jpeg|jpg|png|gif|webp/;
+    const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
+    const mimetype = allowedTypes.test(file.mimetype);
+    
+    if (mimetype && extname) {
+      return cb(null, true);
+    } else {
+      cb(new Error('Chỉ chấp nhận file ảnh (jpeg, jpg, png, gif, webp)'));
+    }
+  }
+});
+
+// Upload avatar endpoint
+exports.uploadAvatar = [
+  avatarUpload.single('avatar'),
+  async (req, res) => {
+    try {
+      const userId = req._id?.toString();
+      if (!userId) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      const file = req.file;
+      if (!file) {
+        return res.status(400).json({ message: "Không có file được upload" });
+      }
+
+      const user = await User.findById(userId);
+      if (!user) {
+        // Delete uploaded file if user not found
+        fs.unlinkSync(file.path);
+        return res.status(404).json({ message: "User không tồn tại" });
+      }
+
+      // Delete old avatar if exists
+      if (user.avatar) {
+        const oldAvatarPath = path.join(__dirname, '..', 'public', user.avatar);
+        if (fs.existsSync(oldAvatarPath)) {
+          fs.unlinkSync(oldAvatarPath);
+        }
+      }
+
+      // Update user avatar
+      const avatarUrl = `/uploads/avatars/${file.filename}`;
+      user.avatar = avatarUrl;
+      await user.save();
+
+      // Bust cache (use v2 key to match getProfileUser)
+      await cacheDel(`users:${userId}`); // Old key
+      await cacheDel(`users:v2:${userId}`); // New key
+      await cacheDel("users:all");
+
+      return res.status(200).json({
+        success: true,
+        message: "Upload avatar thành công",
+        avatar: avatarUrl
+      });
+    } catch (error) {
+      console.error('Upload avatar error:', error);
+      return res.status(500).json({
+        message: "Lỗi upload avatar",
+        error: error.message
+      });
+    }
+  }
+];
+
+// Update profile endpoint
+exports.updateProfile = async (req, res) => {
+  try {
+    const userId = req._id?.toString();
+    if (!userId) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+
+    const { fullName, phoneNumber } = req.body;
+    
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ message: "User không tồn tại" });
+    }
+
+    // Update allowed fields
+    if (fullName !== undefined) user.fullName = fullName;
+    if (phoneNumber !== undefined) user.phoneNumber = phoneNumber;
+
+    await user.save();
+
+    // Bust cache (use v2 key to match getProfileUser)
+    await cacheDel(`users:${userId}`); // Old key
+    await cacheDel(`users:v2:${userId}`); // New key
+    await cacheDel("users:all");
+
+    const updatedUser = await User.findById(userId)
+      .select("-password -verifyToken -verifyTokenExpires -resetToken -resetTokenExpires")
+      .lean();
+
+    return res.status(200).json({
+      success: true,
+      message: "Cập nhật profile thành công",
+      user: updatedUser
+    });
+  } catch (error) {
+    console.error('Update profile error:', error);
+    return res.status(500).json({
+      message: "Lỗi cập nhật profile",
+      error: error.message
+    });
   }
 };
