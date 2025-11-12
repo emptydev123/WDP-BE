@@ -7,6 +7,8 @@ const auth = require('../middlewares/auth');
 router.get('/history/:otherId', auth.authMiddleWare, auth.requireRole('customer','staff','admin'), ChatController.getChatHistory);
 // Lấy danh sách user đã từng chat với current user
 router.get('/partners', auth.authMiddleWare, auth.requireRole('customer','staff','admin'), ChatController.getChatPartners);
+// Upload attachment
+router.post('/upload', auth.authMiddleWare, auth.requireRole('customer','staff','admin'), ChatController.uploadChatFile);
 // Gửi tin nhắn
 router.post('/send', auth.authMiddleWare, auth.requireRole('customer','staff','admin'), ChatController.sendMessage);
 

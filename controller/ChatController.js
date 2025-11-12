@@ -1,5 +1,9 @@
 const Message = require('../model/message');
 const User = require('../model/user');
+const multer = require('multer');
+const sharp = require('sharp');
+const fs = require('fs');
+const path = require('path');
 
 // Lấy lịch sử chat giữa 2 người dùng
 exports.getChatHistory = async (req, res) => {
@@ -20,6 +24,56 @@ exports.getChatHistory = async (req, res) => {
     res.status(500).json({ error: 'Lỗi lấy lịch sử chat' });
   }
 };
+
+// Multer setup (memory for processing)
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
+});
+
+// Ensure upload dir exists
+const ensureDir = (dir) => {
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+};
+
+// Upload file for chat -> returns {url, type, name, size}
+exports.uploadChatFile = [upload.single('file'), async (req, res) => {
+  try {
+    const file = req.file;
+    if (!file) return res.status(400).json({ error: 'No file uploaded' });
+
+    const uploadRoot = path.join(__dirname, '..', 'public', 'uploads', 'chat');
+    ensureDir(uploadRoot);
+
+    const ext = file.mimetype.startsWith('image/') ? 'webp' : (file.originalname.split('.').pop() || 'bin');
+    const baseName = `${Date.now()}_${Math.random().toString(36).slice(2,8)}`;
+    const finalName = `${baseName}.${ext}`;
+    const absPath = path.join(uploadRoot, finalName);
+
+    if (file.mimetype.startsWith('image/')) {
+      // Optimize image
+      await sharp(file.buffer)
+        .rotate()
+        .resize(1280, 1280, { fit: 'inside', withoutEnlargement: true })
+        .webp({ quality: 80 })
+        .toFile(absPath);
+    } else {
+      // Save original buffer for non-image
+      fs.writeFileSync(absPath, file.buffer);
+    }
+
+    const publicUrl = `/uploads/chat/${finalName}`;
+    res.json({
+      url: publicUrl,
+      type: file.mimetype,
+      name: file.originalname,
+      size: file.size,
+    });
+  } catch (err) {
+    console.error('Upload error:', err);
+    res.status(500).json({ error: 'Upload failed' });
+  }
+}];
 
 // Lấy danh sách unique user (đối tác chat) đã từng trao đổi với current user
 exports.getChatPartners = async (req, res) => {
@@ -49,12 +103,17 @@ exports.getChatPartners = async (req, res) => {
 // Gửi tin nhắn
 exports.sendMessage = async (req, res) => {
   const currentUserId = (req._id || req.user?._id)?.toString();
-  const { receiver, content } = req.body || {};
-  if (!currentUserId || !receiver || !content?.trim()) {
+  const { receiver, content, attachments } = req.body || {};
+  if (!currentUserId || !receiver || (!attachments?.length && !content?.trim())) {
     return res.status(400).json({ error: 'Thiếu dữ liệu gửi tin nhắn' });
   }
   try {
-    const message = await Message.create({ sender: currentUserId, receiver, content: content.trim() });
+    const message = await Message.create({
+      sender: currentUserId,
+      receiver,
+      content: content?.trim() || '',
+      attachments: Array.isArray(attachments) ? attachments : [],
+    });
     // Emit realtime tới phòng của receiver
     const io = req.app.get('io');
     if (io) {
@@ -63,6 +122,7 @@ exports.sendMessage = async (req, res) => {
         sender: currentUserId,
         receiver,
         content: message.content,
+        attachments: message.attachments,
         createdAt: message.createdAt,
       });
     }
