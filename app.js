@@ -18,6 +18,19 @@ const bodyParser = require("body-parser");
 // Import payment timeout job to check expired payments every 30s
 require("./job/paymentTimeoutJob");
 
+// CORS must be configured BEFORE other middlewares to handle preflight requests
+app.use(
+  cors({
+    origin: "*", // Cho phép tất cả origins
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
+    allowedHeaders: "*", // Cho phép tất cả headers trong development
+    exposedHeaders: ["Content-Type", "Authorization"],
+    credentials: false,
+    preflightContinue: false,
+    optionsSuccessStatus: 204,
+  })
+);
+
 // API only - no view engine needed
 app.use(logger("dev"));
 app.use(express.json());
@@ -25,14 +38,6 @@ app.use(express.urlencoded({ extended: false }));
 app.use(cookieParser());
 app.use(bodyParser.json());
 app.use(express.static(path.join(__dirname, "public")));
-
-app.use(
-  cors({
-    origin: "*", // Cho phép tất cả origins
-    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"],
-  })
-);
 
 // connect DB
 dbConnect();
