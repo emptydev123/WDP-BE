@@ -114,6 +114,10 @@ exports.sendMessage = async (req, res) => {
       content: content?.trim() || '',
       attachments: Array.isArray(attachments) ? attachments : [],
     });
+    
+    // Lấy thông tin sender để gửi cùng với message
+    const senderInfo = await User.findById(currentUserId).select('_id fullName username email role');
+    
     // Emit realtime tới phòng của receiver
     const io = req.app.get('io');
     if (io) {
@@ -124,6 +128,13 @@ exports.sendMessage = async (req, res) => {
         content: message.content,
         attachments: message.attachments,
         createdAt: message.createdAt,
+        senderInfo: senderInfo ? {
+          _id: senderInfo._id,
+          fullName: senderInfo.fullName,
+          username: senderInfo.username,
+          email: senderInfo.email,
+          role: senderInfo.role,
+        } : null,
       });
     }
     res.json(message);
