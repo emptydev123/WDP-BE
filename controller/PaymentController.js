@@ -136,6 +136,15 @@ exports.createPaymentLink = async (req, res) => {
 
     const response = await payOS.paymentRequests.create(paymentDataForPayOS);
 
+    // Debug: Log PayOS response to see QR code format
+    console.log("🔍 [PaymentController] PayOS response:", {
+      checkoutUrl: response.checkoutUrl,
+      qrCode: response.qrCode,
+      qrCodeType: typeof response.qrCode,
+      qrCodeLength: response.qrCode?.length,
+      qrCodePreview: response.qrCode?.substring(0, 100),
+    });
+
     const paymentData = {
       orderCode: orderCode,
       amount: amount,
@@ -171,8 +180,8 @@ exports.createPaymentLink = async (req, res) => {
         orderCode: orderCode,
         amount: amount,
         description: description,
-        checkoutUrl: response.checkoutUrl,
-        qrCode: response.qrCode,
+        checkoutUrl: response.checkoutUrl || payment.checkoutUrl,
+        qrCode: response.qrCode || payment.qrCode || "",
         timeoutAt: payment.timeoutAt,
         canRetry: payment.canRetry,
         customer_info: {
