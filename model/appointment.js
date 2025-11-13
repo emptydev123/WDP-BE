@@ -28,8 +28,13 @@ const appointmentSchema = new schema(
     notes: {
       type: String,
     },
-    estimated_cost: {
+    deposit_cost: {
       type: Number,
+      default: 0,
+    },
+    final_cost: {
+      type: Number,
+      default: 0,
     },
     reason: {
       type: String,

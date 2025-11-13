@@ -160,7 +160,7 @@ router.post("/", authMiddleWare, ChecklistController.createChecklist);
  * /api/checklist/{checklistId}/accept:
  *   put:
  *     summary: Staff chấp nhận checklist, cập nhật inventory và chuyển appointment status thành "in_progress"
- *     description: Khi staff chấp nhận checklist thành công, hệ thống sẽ cập nhật inventory, tính toán estimated_cost và tự động chuyển appointment status thành "in_progress"
+ *     description: Khi staff chấp nhận checklist thành công, hệ thống sẽ cập nhật inventory, tính toán final_cost và tự động chuyển appointment status thành "in_progress"
  *     tags: [Checklist]
  *     security:
  *       - bearerAuth: []

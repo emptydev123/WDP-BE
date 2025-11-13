@@ -269,7 +269,9 @@ router.get(
  *                       type: string
  *                     status:
  *                       type: string
- *                     estimated_cost:
+ *                     deposit_cost:
+ *                       type: number
+ *                     final_cost:
  *                       type: number
  *                     user_id:
  *                       type: object
@@ -320,7 +322,7 @@ router.post(
   appointment.createAppointment
 );
 
- /**
+/**
  * @swagger
  * /api/appointment/technician-schedule:
  *   get:
@@ -403,7 +405,7 @@ router.post(
 router.get(
   "/technician-schedule",
   auth.authMiddleWare,
-  auth.requireRole("customer","staff", "admin", "technician"),
+  auth.requireRole("customer", "staff", "admin", "technician"),
   appointment.getTechnicianSchedule
 );
 

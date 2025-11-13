@@ -21,7 +21,7 @@ const {
   isPastDate,
   calculateTimeoutAt,
 } = require("../utils/timeUtils");
-const { PAYMENT_EXPIRED_TIME } = require("../utils/constants");
+const { PAYMENT_EXPIRED_TIME, DEPOSIT_COST } = require("../utils/constants");
 var Technican = require("../model/technican");
 const { getDayOfWeek } = require("../utils/logicSlots");
 var ServiceCenterHours = require("../model/serviceCenterHours");
@@ -252,7 +252,7 @@ exports.getTechnicianSchedule = async (req, res) => {
         .populate("center_id", "center_name address")
         .populate("service_type_id", "service_name estimated_duration")
         .select(
-          "appoinment_date appoinment_time estimated_end_time status notes estimated_cost"
+          "appoinment_date appoinment_time estimated_end_time status notes deposit_cost final_cost"
         )
         .sort({ appoinment_date: 1, appoinment_time: 1 })
         .lean();
@@ -440,7 +440,7 @@ exports.assignTechnician = async (req, res) => {
 
     const updatedAppointment = await Appointment.findById(appointment_id)
       .populate("user_id", "username fullName email phoneNumber")
-      .populate("center_id", "name address phoneNumber")
+      .populate("center_id", "center_name address phone")
       .populate("vehicle_id", "license_plate brand model year")
       .populate("staff_id", "username fullName email phoneNumber role")
       .populate("technician_id", "username fullName email phoneNumber role")
@@ -517,7 +517,7 @@ exports.getMyAppointments = async (req, res) => {
 
     const appointments = await Appointment.find(query)
       .populate("user_id", "username fullName email phoneNumber")
-      .populate("center_id", "name address phone")
+      .populate("center_id", "center_name address phone")
       .populate("vehicle_id", "license_plate brand model year")
       .populate("staff_id", "username fullName email phoneNumber role")
       .populate("technician_id", "username fullName email phoneNumber role")
@@ -623,14 +623,13 @@ exports.updateAppointmentStatus = async (req, res) => {
       }
     }
 
-    // Logic xử lý estimated_cost khi status thay đổi
-    // estimated_cost được quản lý bởi payment flow (set 0 khi payment paid)
+    // deposit_cost và final_cost được quản lý khi tạo appointment và accept checklist
 
     await appointment.save();
 
     const updatedAppointment = await Appointment.findById(appointment_id)
       .populate("user_id", "username fullName email phoneNumber")
-      .populate("center_id", "name address phone")
+      .populate("center_id", "center_name address phone")
       .populate("vehicle_id", "license_plate brand model year")
       .lean();
 
@@ -663,7 +662,7 @@ exports.getAppointmentById = async (req, res) => {
 
     const appointment = await Appointment.findById(appointmentId)
       .populate("user_id", "username fullName email phoneNumber address")
-      .populate("center_id", "name address phone")
+      .populate("center_id", "center_name address phone")
       .populate("vehicle_id", "license_plate brand model year color")
       .populate("staff_id", "username fullName email phoneNumber role")
       .populate("technician_id", "username fullName email phoneNumber role")
@@ -757,7 +756,7 @@ exports.getAppointmentsByUsername = async (req, res) => {
 
     const appointments = await Appointment.find(query)
       .populate("user_id", "username fullName email phoneNumber")
-      .populate("center_id", "name address phone")
+      .populate("center_id", "center_name address phone")
       .populate("vehicle_id", "license_plate brand model year")
       .populate("staff_id", "username fullName email phoneNumber role")
       .populate("technician_id", "username fullName email phoneNumber role")
@@ -851,7 +850,7 @@ exports.getAppointmentsByTechnician = async (req, res) => {
 
     const appointments = await Appointment.find(query)
       .populate("user_id", "username fullName email phoneNumber")
-      .populate("center_id", "name address phone")
+      .populate("center_id", "center_name address phone")
       .populate("vehicle_id", "license_plate brand model year")
       .populate("staff_id", "username fullName email phoneNumber role")
       .populate("technician_id", "username fullName email phoneNumber role")
@@ -978,7 +977,7 @@ exports.createFinalPayment = async (req, res) => {
       });
     }
 
-    const remainingAmount = appointment.estimated_cost || 0;
+    const remainingAmount = appointment.final_cost || 0;
 
     if (remainingAmount <= 0) {
       return res.status(400).json({
@@ -1020,7 +1019,7 @@ exports.createFinalPayment = async (req, res) => {
         description: finalPaymentDescription,
         status: "PENDING",
         user_id: appointment.user_id._id,
-        timeoutAt: calculateTimeoutAt(PAYMENT_EXPIRED_TIME), // Default 15 phút cho fallback
+        timeoutAt: calculateTimeoutAt(PAYMENT_EXPIRED_TIME),
       });
 
       await fallbackPayment.save();
@@ -1041,7 +1040,7 @@ exports.createFinalPayment = async (req, res) => {
 
       const populatedAppointment = await Appointment.findById(appointmentId)
         .populate("user_id", "username fullName email phoneNumber")
-        .populate("center_id", "name address phone")
+        .populate("center_id", "center_name address phone")
         .populate("vehicle_id", "license_plate brand model year")
 
         .populate(
@@ -1342,7 +1341,7 @@ exports.autoAssignTechnician = async ({
 };
 
 exports.createDepositPayment = async (userId, appointmentId) => {
-  const depositAmount = 2000;
+  const depositAmount = DEPOSIT_COST;
   const description = `Tam ung ${appointmentId.toString().slice(-6)}`;
 
   let paymentResult = null;
@@ -1601,7 +1600,8 @@ exports.createAppointment = async (req, res) => {
       appoinment_date: new Date(appoinment_date),
       appoinment_time,
       notes,
-      estimated_cost: 2000, // Set estimated_cost ban đầu là 2000
+      deposit_cost: DEPOSIT_COST, // Set deposit_cost từ constant
+      final_cost: 0, // final_cost sẽ được set khi accept checklist
       user_id,
       vehicle_id,
       center_id,

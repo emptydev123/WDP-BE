@@ -436,7 +436,7 @@ exports.acceptChecklist = async (req, res) => {
     await checklist.save();
 
     await Appointment.findByIdAndUpdate(appointment._id, {
-      estimated_cost: totalCost,
+      final_cost: totalCost,
       status: "in_progress",
     });
 
