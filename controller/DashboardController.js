@@ -291,7 +291,7 @@ exports.getDashboardOverview = async (req, res) => {
 exports.getTopBrandsByRepairs = async (req, res) => {
   try {
     const userId = req._id?.toString();
-    const { date_from, date_to, center_id } = req.query;
+    const { date_from, date_to, center_id, status } = req.query;
 
     if (!userId) {
       return res.status(401).json({
@@ -321,8 +321,12 @@ exports.getTopBrandsByRepairs = async (req, res) => {
     // Lấy appointments trong khoảng thời gian
     const matchFilter = {
       appoinment_date: { $gte: startDate, $lte: endDate },
-      status: { $in: ["completed", "repaired", "in_progress"] },
     };
+
+    // Thêm filter status nếu có, nếu không thì lấy tất cả
+    if (status) {
+      matchFilter.status = status;
+    }
 
     // Thêm filter center_id nếu có
     if (center_id) {
@@ -396,7 +400,7 @@ exports.getTopBrandsByRepairs = async (req, res) => {
 exports.getTopPartsReplaced = async (req, res) => {
   try {
     const userId = req._id?.toString();
-    const { date_from, date_to, center_id } = req.query;
+    const { date_from, date_to, center_id, status } = req.query;
 
     if (!userId) {
       return res.status(401).json({
@@ -426,8 +430,12 @@ exports.getTopPartsReplaced = async (req, res) => {
     // Tạo filter cho checklist
     const checklistFilter = {
       createdAt: { $gte: startDate, $lte: endDate },
-      status: { $in: ["accepted", "completed"] },
     };
+
+    // Thêm filter status nếu có, nếu không thì lấy tất cả
+    if (status) {
+      checklistFilter.status = status;
+    }
 
     // Lấy checklists trong khoảng thời gian và đã được accepted hoặc completed
     let checklists = await Checklist.find(checklistFilter)
@@ -499,7 +507,7 @@ exports.getTopPartsReplaced = async (req, res) => {
 exports.getTopTechniciansByAppointments = async (req, res) => {
   try {
     const userId = req._id?.toString();
-    const { date_from, date_to, center_id } = req.query;
+    const { date_from, date_to, center_id, status } = req.query;
 
     if (!userId) {
       return res.status(401).json({
@@ -531,6 +539,11 @@ exports.getTopTechniciansByAppointments = async (req, res) => {
       technician_id: { $ne: null },
       appoinment_date: { $gte: startDate, $lte: endDate },
     };
+
+    // Thêm filter status nếu có, nếu không thì lấy tất cả
+    if (status) {
+      matchFilter.status = status;
+    }
 
     // Thêm filter center_id nếu có
     if (center_id) {
@@ -605,7 +618,7 @@ exports.getTopTechniciansByAppointments = async (req, res) => {
 exports.getTopTechniciansByRevenue = async (req, res) => {
   try {
     const userId = req._id?.toString();
-    const { date_from, date_to, center_id } = req.query;
+    const { date_from, date_to, center_id, status } = req.query;
 
     if (!userId) {
       return res.status(401).json({
@@ -638,6 +651,11 @@ exports.getTopTechniciansByRevenue = async (req, res) => {
       appoinment_date: { $gte: startDate, $lte: endDate },
       $or: [{ payment_id: { $ne: null } }, { final_payment_id: { $ne: null } }],
     };
+
+    // Thêm filter status nếu có, nếu không thì lấy tất cả
+    if (status) {
+      matchFilter.status = status;
+    }
 
     // Thêm filter center_id nếu có
     if (center_id) {

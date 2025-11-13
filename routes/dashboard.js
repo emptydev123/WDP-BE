@@ -75,6 +75,12 @@ router.get(
  *         schema:
  *           type: string
  *         description: Lọc theo Service Center ID
+ *       - in: query
+ *         name: status
+ *         schema:
+ *           type: string
+ *           enum: [pending, assigned, check_in, in_progress, repaired, completed, canceled]
+ *         description: Lọc theo trạng thái appointment. Nếu không truyền thì lấy tất cả
  *     responses:
  *       200:
  *         description: Top 5 hãng xe sửa nhiều nhất
@@ -111,6 +117,12 @@ router.get(
  *         schema:
  *           type: string
  *         description: Lọc theo Service Center ID
+ *       - in: query
+ *         name: status
+ *         schema:
+ *           type: string
+ *           enum: [pending, accepted, completed, canceled]
+ *         description: Lọc theo trạng thái checklist. Nếu không truyền thì lấy tất cả
  *     responses:
  *       200:
  *         description: Top 5 phụ tùng thay nhiều nhất
@@ -147,6 +159,12 @@ router.get(
  *         schema:
  *           type: string
  *         description: Lọc theo Service Center ID
+ *       - in: query
+ *         name: status
+ *         schema:
+ *           type: string
+ *           enum: [pending, assigned, check_in, in_progress, repaired, completed, canceled]
+ *         description: Lọc theo trạng thái appointment. Nếu không truyền thì lấy tất cả
  *     responses:
  *       200:
  *         description: Top 5 nhân viên có nhiều appointment nhất
@@ -183,6 +201,12 @@ router.get(
  *         schema:
  *           type: string
  *         description: Lọc theo Service Center ID
+ *       - in: query
+ *         name: status
+ *         schema:
+ *           type: string
+ *           enum: [pending, assigned, check_in, in_progress, repaired, completed, canceled]
+ *         description: Lọc theo trạng thái appointment. Nếu không truyền thì lấy tất cả
  *     responses:
  *       200:
  *         description: Danh sách nhân viên kiếm nhiều tiền nhất
