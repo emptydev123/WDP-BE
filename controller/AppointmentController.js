@@ -26,6 +26,7 @@ var Technican = require("../model/technican");
 const { getDayOfWeek } = require("../utils/logicSlots");
 var ServiceCenterHours = require("../model/serviceCenterHours");
 const { checkAndUpdateSlotsForNextWeek } = require("../utils/logicSlots");
+const { createAppointmentReminder } = require("../utils/reminder");
 exports.getAppointments = async (req, res) => {
   try {
     const {
@@ -1352,8 +1353,8 @@ exports.createDepositPayment = async (userId, appointmentId) => {
   let paymentResult = null;
   const paymentReq = {
     _id: userId,
-    body: { 
-      amount: depositAmount, 
+    body: {
+      amount: depositAmount,
       description,
       timeoutSeconds: PAYMENT_EXPIRED_TIME // Truyền timeout từ constant (60 giây)
     },
@@ -1615,6 +1616,23 @@ exports.createAppointment = async (req, res) => {
     });
 
     await appointment.save();
+
+    try {
+      const vehicleDoc = await Vehicle.findById(vehicle_id).select(
+        "license_plate user_id"
+      );
+      if (vehicleDoc) {
+        await createAppointmentReminder({
+          appointment,
+          vehicle: vehicleDoc,
+        });
+      }
+    } catch (reminderErr) {
+      console.error(
+        "Create appointment reminder error:",
+        reminderErr?.message || reminderErr
+      );
+    }
 
     //  Xử lý thanh toán tiền cọc nếu có
     const paymentResult = await exports.createDepositPayment(

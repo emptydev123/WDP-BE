@@ -1,29 +1,47 @@
-var Reminder = require('../model/maintenanceReminders');
-var Vehicle = require('../model/vehicle');
+const Reminder = require("../model/maintenanceReminders");
+const Vehicle = require("../model/vehicle");
 
 exports.getNotification = async (req, res) => {
     try {
         const userId = req.user.id;
-        
-        // Lấy tất cả vehicle của user
-        const userVehicles = await Vehicle.find({ user_id: userId }).select('_id');
-        const vehicleIds = userVehicles.map(v => v._id);
-        
-        // Lấy reminders của các xe thuộc user
-        const reminder = await Reminder.find({
-            is_sent: true,
-            vehicle_id: { $in: vehicleIds }
+        res.set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+        res.set("Pragma", "no-cache");
+        res.set("Expires", "0");
+
+        const userVehicles = await Vehicle.find({ user_id: userId }).select("_id");
+        const vehicleIds = userVehicles.map((v) => v._id);
+
+        const now = new Date();
+
+        const reminders = await Reminder.find({
+            vehicle_id: { $in: vehicleIds },
+            $or: [
+                { is_sent: true },
+                {
+                    reminder_type: "appointment",
+                    is_sent: false,
+                    due_date: { $gte: now },
+                },
+            ],
         })
-        .populate('vehicle_id')
-        .sort({ createdAt: -1 })
-        .limit(50);
-        
-        // Lọc bỏ các reminder có vehicle_id null (trường hợp vehicle đã bị xóa)
-        const validReminders = reminder.filter(r => r.vehicle_id !== null);
-        
+            .populate("vehicle_id", "license_plate model_id user_id")
+            .populate({
+                path: "appointment_id",
+                select: "appoinment_date appoinment_time status center_id service_type_id",
+                populate: [
+                    { path: "center_id", select: "center_name address phone" },
+                    { path: "service_type_id", select: "service_name" },
+                ],
+            })
+            .sort({ due_date: -1, createdAt: -1 })
+            .limit(50)
+            .lean();
+
+        const validReminders = reminders.filter((r) => r.vehicle_id);
+
         res.status(200).json({
             message: "Get data successfully",
-            data: validReminders
+            data: validReminders,
         });
     } catch (error) {
         return res.status(500).json({
@@ -32,23 +50,23 @@ exports.getNotification = async (req, res) => {
             success: false,
         });
     }
-}
+};
 
 exports.markAsRead = async (req, res) => {
     try {
         const userId = req.user.id;
         const { notificationId } = req.params;
-        
+
         // Lấy reminder
         const reminder = await Reminder.findById(notificationId).populate('vehicle_id');
-        
+
         if (!reminder) {
             return res.status(404).json({
                 message: "Không tìm thấy thông báo",
                 success: false,
             });
         }
-        
+
         // Kiểm tra xe có thuộc user không
         if (!reminder.vehicle_id || reminder.vehicle_id.user_id.toString() !== userId) {
             return res.status(403).json({
@@ -56,11 +74,11 @@ exports.markAsRead = async (req, res) => {
                 success: false,
             });
         }
-        
+
         // Đánh dấu đã đọc
         reminder.is_read = true;
         await reminder.save();
-        
+
         res.status(200).json({
             message: "Đã đánh dấu đọc thành công",
             success: true,
@@ -77,11 +95,11 @@ exports.markAsRead = async (req, res) => {
 exports.markAllAsRead = async (req, res) => {
     try {
         const userId = req.user.id;
-        
+
         // Lấy tất cả vehicle của user
         const userVehicles = await Vehicle.find({ user_id: userId }).select('_id');
         const vehicleIds = userVehicles.map(v => v._id);
-        
+
         // Đánh dấu tất cả reminder của user là đã đọc
         await Reminder.updateMany(
             {
@@ -93,7 +111,7 @@ exports.markAllAsRead = async (req, res) => {
                 $set: { is_read: true }
             }
         );
-        
+
         res.status(200).json({
             message: "Đã đánh dấu tất cả đã đọc",
             success: true,
