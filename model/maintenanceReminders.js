@@ -5,6 +5,7 @@ const maintenanceRemindersSchema = new schema({
     due_date: Date,
     message: String,
     is_sent: { type: Boolean, default: false },
+    is_read: { type: Boolean, default: false },
     vehicle_id: { type: mongoose.Types.ObjectId, ref: "Vehicle", required: true },
 }, { timestamps: true });
 const maintenanceReminders = mongoose.model("MaintenanceReminders", maintenanceRemindersSchema);

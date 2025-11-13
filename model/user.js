@@ -38,6 +38,10 @@ const userSchema = new schema(
       type: String,
       enum: ["male", "female"],
     },
+    avatar: {
+      type: String,
+      default: null,
+    },
     resetToken: {
       type: String,
     },

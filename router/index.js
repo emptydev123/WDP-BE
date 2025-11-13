@@ -15,6 +15,8 @@ const checklistRouter = require("../routes/checklist");
 const dashboardRouter = require("../routes/dashboard");
 const PaymentController = require("../controller/PaymentController");
 
+const chatRouter = require("../routes/chat");
+
 // Webhook endpoint cho PayOS (không cần auth)
 router.post("/webhook/payos", PaymentController.handlePayOSWebhook);
 
@@ -31,5 +33,7 @@ router.use("/issue-types", issueTypeRouter);
 router.use("/notifications", notificationRouter);
 router.use("/checklist", checklistRouter);
 router.use("/dashboard", dashboardRouter);
+
+router.use("/chat", chatRouter);
 
 module.exports = router;

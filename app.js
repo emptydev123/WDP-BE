@@ -39,6 +39,20 @@ app.use(cookieParser());
 app.use(bodyParser.json());
 app.use(express.static(path.join(__dirname, "public")));
 
+app.use(
+  cors({
+    origin: "*", // Cho phép tất cả origins
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization", "Cache-Control", "Pragma", "Expires"],
+    credentials: true,
+    preflightContinue: false,
+    optionsSuccessStatus: 204
+  })
+);
+
+// Handle preflight requests
+app.options('*', cors());
+
 // connect DB
 dbConnect();
 app.use("/api", routes);

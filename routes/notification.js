@@ -62,4 +62,47 @@ const { authMiddleWare } = require('../middlewares/auth');
  */
 router.get('/get', authMiddleWare, notificationController.getNotification);
 
+/**
+ * @swagger
+ * /api/notifications/read-all:
+ *   patch:
+ *     summary: Đánh dấu tất cả thông báo đã đọc
+ *     tags: [Notifications]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Success
+ *       500:
+ *         description: Internal Server Error
+ */
+router.patch('/read-all', authMiddleWare, notificationController.markAllAsRead);
+
+/**
+ * @swagger
+ * /api/notifications/{notificationId}/read:
+ *   patch:
+ *     summary: Đánh dấu 1 thông báo đã đọc
+ *     tags: [Notifications]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: notificationId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: ID của thông báo
+ *     responses:
+ *       200:
+ *         description: Success
+ *       404:
+ *         description: Không tìm thấy thông báo
+ *       403:
+ *         description: Không có quyền
+ *       500:
+ *         description: Internal Server Error
+ */
+router.patch('/:notificationId/read', authMiddleWare, notificationController.markAsRead);
+
 module.exports = router;
