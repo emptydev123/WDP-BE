@@ -136,6 +136,15 @@ exports.createPaymentLink = async (req, res) => {
 
     const response = await payOS.paymentRequests.create(paymentDataForPayOS);
 
+    // Debug: Log PayOS response to see QR code format
+    console.log("🔍 [PaymentController] PayOS response:", {
+      checkoutUrl: response.checkoutUrl,
+      qrCode: response.qrCode,
+      qrCodeType: typeof response.qrCode,
+      qrCodeLength: response.qrCode?.length,
+      qrCodePreview: response.qrCode?.substring(0, 100),
+    });
+
     const paymentData = {
       orderCode: orderCode,
       amount: amount,
@@ -171,8 +180,8 @@ exports.createPaymentLink = async (req, res) => {
         orderCode: orderCode,
         amount: amount,
         description: description,
-        checkoutUrl: response.checkoutUrl,
-        qrCode: response.qrCode,
+        checkoutUrl: response.checkoutUrl || payment.checkoutUrl,
+        qrCode: response.qrCode || payment.qrCode || "",
         timeoutAt: payment.timeoutAt,
         canRetry: payment.canRetry,
         customer_info: {
@@ -253,23 +262,28 @@ exports.updatePaymentStatus = async (req, res) => {
     }
     await payment.save();
 
-    // Khi payment status = "PAID", cập nhật estimated_cost = 0 và status = "assigned" cho appointment
+    // Khi payment status = "PAID", cập nhật status appointment
     if (normalizedStatus === "PAID") {
-      // Tìm appointment có payment_id hoặc final_payment_id tương ứng
-      // Chỉ cập nhật appointment đang pending
-      const updateResult = await Appointment.updateMany(
+      // Cập nhật appointment với deposit payment (payment_id)
+      const depositUpdateResult = await Appointment.updateMany(
         {
-          $or: [{ payment_id: payment._id }, { final_payment_id: payment._id }],
+          payment_id: payment._id,
           status: "pending", // Chỉ cập nhật appointment đang pending
-          estimated_cost: { $ne: 0 },
         },
         {
-          estimated_cost: 0,
-          status: "assigned", // Cập nhật status thành assigned khi đã thanh toán
+          status: "assigned", // Cập nhật status thành assigned khi đã thanh toán deposit
         }
       );
-      console.log(
-        `Updated ${updateResult.modifiedCount} appointments with payment ${payment._id} (status -> assigned, estimated_cost -> 0)`
+
+      // Cập nhật appointment với final payment (final_payment_id)
+      const finalUpdateResult = await Appointment.updateMany(
+        {
+          final_payment_id: payment._id,
+          status: "repaired", // Chỉ cập nhật appointment đã repaired
+        },
+        {
+          status: "completed", // Cập nhật status thành completed khi đã thanh toán final payment
+        }
       );
     }
 
@@ -569,23 +583,32 @@ exports.handlePayOSWebhook = async (req, res) => {
       // Chỉ cập nhật appointment khi status = PAID và payment đã được update
       if (status === "PAID" && updatedPayment) {
         // Đảm bảo không cập nhật nhiều lần (idempotency)
-        // Chỉ cập nhật appointment có status = "pending" và chưa có estimated_cost = 0
-        const updateResult = await Appointment.updateMany(
+        // Cập nhật appointment với deposit payment (payment_id)
+        const depositUpdateResult = await Appointment.updateMany(
           {
-            $or: [
-              { payment_id: updatedPayment._id },
-              { final_payment_id: updatedPayment._id },
-            ],
+            payment_id: updatedPayment._id,
             status: "pending", // Chỉ cập nhật appointment đang pending
-            estimated_cost: { $ne: 0 },
           },
           {
-            estimated_cost: 0,
-            status: "assigned", // Cập nhật status thành assigned khi đã thanh toán
+            status: "assigned", // Cập nhật status thành assigned khi đã thanh toán deposit
           }
         );
         console.log(
-          `Updated ${updateResult.modifiedCount} appointments with payment ${updatedPayment._id} (status -> assigned, estimated_cost -> 0)`
+          `Updated ${depositUpdateResult.modifiedCount} appointments with deposit payment ${updatedPayment._id} (status -> assigned)`
+        );
+
+        // Cập nhật appointment với final payment (final_payment_id)
+        const finalUpdateResult = await Appointment.updateMany(
+          {
+            final_payment_id: updatedPayment._id,
+            status: "repaired", // Chỉ cập nhật appointment đã repaired
+          },
+          {
+            status: "completed", // Cập nhật status thành completed khi đã thanh toán final payment
+          }
+        );
+        console.log(
+          `Updated ${finalUpdateResult.modifiedCount} appointments with final payment ${updatedPayment._id} (status -> completed)`
         );
       }
     }
@@ -937,42 +960,6 @@ exports.paymentCancel = async (req, res) => {
     console.error("Payment cancel redirect error:", error);
     return res.status(500).json({
       message: "Lỗi xử lý redirect hủy",
-      error: error.message,
-      success: false,
-    });
-  }
-};
-
-// ========== DEBUG API ==========
-exports.debugAllPayments = async (req, res) => {
-  try {
-    const payments = await Payment.find({})
-      .sort({ createdAt: -1 })
-      .limit(10)
-      .lean();
-
-    console.log("debugAllPayments - found:", payments.length);
-
-    return res.status(200).json({
-      message: "Debug payments",
-      success: true,
-      data: {
-        count: payments.length,
-        payments: payments.map((p) => ({
-          _id: p._id,
-          orderCode: p.orderCode,
-          order_code: p.order_code,
-          amount: p.amount,
-          status: p.status,
-          user_id: p.user_id,
-          createdAt: p.createdAt,
-        })),
-      },
-    });
-  } catch (error) {
-    console.error("Debug payments error:", error);
-    return res.status(500).json({
-      message: "Debug failed",
       error: error.message,
       success: false,
     });
