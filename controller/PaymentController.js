@@ -265,7 +265,7 @@ exports.updatePaymentStatus = async (req, res) => {
     // Khi payment status = "PAID", cập nhật status appointment
     if (normalizedStatus === "PAID") {
       // Cập nhật appointment với deposit payment (payment_id)
-      const depositUpdateResult = await Appointment.updateMany(
+      await Appointment.updateMany(
         {
           payment_id: payment._id,
           status: "pending", // Chỉ cập nhật appointment đang pending
@@ -276,7 +276,7 @@ exports.updatePaymentStatus = async (req, res) => {
       );
 
       // Cập nhật appointment với final payment (final_payment_id)
-      const finalUpdateResult = await Appointment.updateMany(
+      await Appointment.updateMany(
         {
           final_payment_id: payment._id,
           status: "repaired", // Chỉ cập nhật appointment đã repaired
@@ -285,6 +285,34 @@ exports.updatePaymentStatus = async (req, res) => {
           status: "completed", // Cập nhật status thành completed khi đã thanh toán final payment
         }
       );
+
+      // Emit socket events to affected customers
+      try {
+        const io = req.app.get("io");
+        if (io) {
+          const affected = await Appointment.find({
+            $or: [
+              { payment_id: payment._id },
+              { final_payment_id: payment._id },
+            ],
+          })
+            .select("_id status user_id")
+            .populate("user_id", "_id")
+            .lean();
+
+          affected.forEach((appt) => {
+            const room = appt?.user_id?._id?.toString();
+            if (room) {
+              io.to(room).emit("appointment_updated", {
+                appointment_id: appt._id,
+                status: appt.status,
+              });
+            }
+          });
+        }
+      } catch (e) {
+        console.error("Socket emit error (updatePaymentStatus):", e?.message || e);
+      }
     }
 
     console.log(
@@ -374,6 +402,34 @@ exports.getPaymentTransaction = async (req, res) => {
             { final_payment_id: payment._id, status: "repaired" },
             { status: "completed" }
           );
+
+          // Emit socket events to affected customers
+          try {
+            const io = req.app.get("io");
+            if (io) {
+              const affected = await Appointment.find({
+                $or: [
+                  { payment_id: payment._id },
+                  { final_payment_id: payment._id },
+                ],
+              })
+                .select("_id status user_id")
+                .populate("user_id", "_id")
+                .lean();
+
+              affected.forEach((appt) => {
+                const room = appt?.user_id?._id?.toString();
+                if (room) {
+                  io.to(room).emit("appointment_updated", {
+                    appointment_id: appt._id,
+                    status: appt.status,
+                  });
+                }
+              });
+            }
+          } catch (e) {
+            console.error("Socket emit error (getPaymentTransaction):", e?.message || e);
+          }
         }
 
         // Reflect updated status in memory object for response
@@ -614,7 +670,7 @@ exports.handlePayOSWebhook = async (req, res) => {
       if (status === "PAID" && updatedPayment) {
         // Đảm bảo không cập nhật nhiều lần (idempotency)
         // Cập nhật appointment với deposit payment (payment_id)
-        const depositUpdateResult = await Appointment.updateMany(
+        await Appointment.updateMany(
           {
             payment_id: updatedPayment._id,
             status: "pending", // Chỉ cập nhật appointment đang pending
@@ -623,12 +679,9 @@ exports.handlePayOSWebhook = async (req, res) => {
             status: "assigned", // Cập nhật status thành assigned khi đã thanh toán deposit
           }
         );
-        console.log(
-          `Updated ${depositUpdateResult.modifiedCount} appointments with deposit payment ${updatedPayment._id} (status -> assigned)`
-        );
 
         // Cập nhật appointment với final payment (final_payment_id)
-        const finalUpdateResult = await Appointment.updateMany(
+        await Appointment.updateMany(
           {
             final_payment_id: updatedPayment._id,
             status: "repaired", // Chỉ cập nhật appointment đã repaired
@@ -637,9 +690,34 @@ exports.handlePayOSWebhook = async (req, res) => {
             status: "completed", // Cập nhật status thành completed khi đã thanh toán final payment
           }
         );
-        console.log(
-          `Updated ${finalUpdateResult.modifiedCount} appointments with final payment ${updatedPayment._id} (status -> completed)`
-        );
+
+        // Emit socket events to affected customers
+        try {
+          const io = req.app.get("io");
+          if (io) {
+            const affected = await Appointment.find({
+              $or: [
+                { payment_id: updatedPayment._id },
+                { final_payment_id: updatedPayment._id },
+              ],
+            })
+              .select("_id status user_id")
+              .populate("user_id", "_id")
+              .lean();
+
+            affected.forEach((appt) => {
+              const room = appt?.user_id?._id?.toString();
+              if (room) {
+                io.to(room).emit("appointment_updated", {
+                  appointment_id: appt._id,
+                  status: appt.status,
+                });
+              }
+            });
+          }
+        } catch (e) {
+          console.error("Socket emit error (handlePayOSWebhook):", e?.message || e);
+        }
       }
     }
 

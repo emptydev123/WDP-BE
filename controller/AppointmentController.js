@@ -459,6 +459,21 @@ exports.assignTechnician = async (req, res) => {
       )
       .lean();
 
+    // Emit socket event to customer room
+    try {
+      const io = req.app.get("io");
+      if (io && updatedAppointment?.user_id?._id) {
+        io
+          .to(updatedAppointment.user_id._id.toString())
+          .emit("appointment_updated", {
+            appointment_id: updatedAppointment._id,
+            status: updatedAppointment.status,
+          });
+      }
+    } catch (e) {
+      console.error("Socket emit error (assignTechnician):", e?.message || e);
+    }
+
     return res.status(200).json({
       message: "Assign technician thành công",
       success: true,
@@ -633,6 +648,24 @@ exports.updateAppointmentStatus = async (req, res) => {
       .populate("center_id", "center_name address phone")
       .populate("vehicle_id", "license_plate brand model year")
       .lean();
+
+    // Emit socket event to customer room
+    try {
+      const io = req.app.get("io");
+      if (io && updatedAppointment?.user_id?._id) {
+        io
+          .to(updatedAppointment.user_id._id.toString())
+          .emit("appointment_updated", {
+            appointment_id: updatedAppointment._id,
+            status: updatedAppointment.status,
+          });
+      }
+    } catch (e) {
+      console.error(
+        "Socket emit error (updateAppointmentStatus):",
+        e?.message || e
+      );
+    }
 
     return res.status(200).json({
       message: "Cập nhật trạng thái appointment thành công",
