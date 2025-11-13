@@ -1050,7 +1050,7 @@ exports.createFinalPayment = async (req, res) => {
         )
         .populate(
           "final_payment_id",
-          "orderCode amount status checkoutUrl qrCode"
+          "orderCode amount status checkoutUrl qrCode timeoutAt"
         );
 
       return res.status(200).json({

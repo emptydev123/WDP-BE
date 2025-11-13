@@ -346,11 +346,40 @@ exports.getPaymentTransaction = async (req, res) => {
       });
     }
 
+    // Fallback: query PayOS and synchronize status to DB if webhook missed
     try {
       const transactionInfo = await payOS.paymentRequests.get(
         parseInt(order_code)
       );
-      console.log("getPaymentTransaction - PayOS info:", transactionInfo);
+      const derived = deriveStatus(transactionInfo);
+      console.log("getPaymentTransaction - PayOS info:", {
+        status: derived,
+      });
+      if (derived && derived !== payment.status) {
+        // Update DB to reflect latest PayOS status
+        const update = { status: derived, updatedAt: new Date() };
+        if (derived === "PAID") update.paidAt = new Date();
+        await Payment.updateOne(
+          { _id: payment._id },
+          { $set: update }
+        );
+
+        // Also update related appointment statuses when paid
+        if (derived === "PAID") {
+          await Appointment.updateMany(
+            { payment_id: payment._id, status: "pending" },
+            { status: "assigned" }
+          );
+          await Appointment.updateMany(
+            { final_payment_id: payment._id, status: "repaired" },
+            { status: "completed" }
+          );
+        }
+
+        // Reflect updated status in memory object for response
+        payment.status = derived;
+        if (derived === "PAID") payment.paidAt = new Date();
+      }
     } catch (payosError) {
       console.log("getPaymentTransaction - PayOS error:", payosError.message);
     }
@@ -375,6 +404,7 @@ exports.getPaymentTransaction = async (req, res) => {
               role: payment.user_id.role,
             }
           : null,
+        timeoutAt: payment.timeoutAt,
       },
     });
   } catch (error) {
