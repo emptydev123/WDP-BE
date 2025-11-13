@@ -24,8 +24,11 @@ app.set('port', port);
  */
 
 var server = http.createServer(app);
+
 const io = initializeSocketServer(server);
 setIoInstance(io);  // Set io instance sau khi khởi tạo xong
+// Gán io vào app để controller có thể truy cập
+app.set('io', io);
 
 /**
  * Listen on provided port, on all network interfaces.

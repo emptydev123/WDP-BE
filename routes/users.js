@@ -275,4 +275,73 @@ router.post("/forgotPassword", user.forgotPassword);
  */
 router.post("/resetpassword", user.resetPassword);
 
+/**
+ * @swagger
+ * /api/users/upload-avatar:
+ *   post:
+ *     summary: Upload avatar cho user hiện tại
+ *     tags: [Users]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               avatar:
+ *                 type: string
+ *                 format: binary
+ *     responses:
+ *       200:
+ *         description: Upload avatar thành công
+ *       400:
+ *         description: Không có file được upload
+ *       401:
+ *         description: Unauthorized
+ */
+router.post(
+  "/upload-avatar",
+  auth.authMiddleWare,
+  auth.requireRole("customer", "staff", "admin", "technician"),
+  ...user.uploadAvatar
+);
+
+/**
+ * @swagger
+ * /api/users/update-profile:
+ *   put:
+ *     summary: Cập nhật thông tin profile
+ *     tags: [Users]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               fullName:
+ *                 type: string
+ *                 example: "Nguyễn Văn A"
+ *               phoneNumber:
+ *                 type: string
+ *                 example: "0901234567"
+ *     responses:
+ *       200:
+ *         description: Cập nhật profile thành công
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: User không tồn tại
+ */
+router.put(
+  "/update-profile",
+  auth.authMiddleWare,
+  auth.requireRole("customer", "staff", "admin", "technician"),
+  user.updateProfile
+);
+
 module.exports = router;
