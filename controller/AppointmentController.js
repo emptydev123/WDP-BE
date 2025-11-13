@@ -151,7 +151,7 @@ exports.getAppointments = async (req, res) => {
         "service_type_id",
         "service_name description base_price estimated_duration"
       )
-      .sort({ appoinment_date: -1 })
+      .sort({ createdAt: -1 })
       .skip(pagination.skip)
       .limit(pagination.limit)
       .lean();
@@ -533,7 +533,7 @@ exports.getMyAppointments = async (req, res) => {
         "service_type_id",
         "service_name description base_price estimated_duration"
       )
-      .sort({ appoinment_date: -1 })
+      .sort({ createdAt: -1 })
       .skip(pagination.skip)
       .limit(pagination.limit)
       .lean();
@@ -769,12 +769,12 @@ exports.getAppointmentsByUsername = async (req, res) => {
         "final_payment_id",
         "orderCode amount status checkoutUrl qrCode"
       )
-      .sort({ appoinment_date: -1 })
+      .sort({ createdAt: -1 })
       .skip(pagination.skip)
       .limit(pagination.limit)
       .lean();
 
-    const response = createAppointmentResponse(
+    const response = createPaginatedResponse(
       appointments,
       pagination,
       "Lấy danh sách appointment theo username thành công"
@@ -863,12 +863,12 @@ exports.getAppointmentsByTechnician = async (req, res) => {
         "final_payment_id",
         "orderCode amount status checkoutUrl qrCode"
       )
-      .sort({ appoinment_date: -1 })
+      .sort({ createdAt: -1 })
       .skip(pagination.skip)
       .limit(pagination.limit)
       .lean();
 
-    const response = createAppointmentResponse(
+    const response = createPaginatedResponse(
       appointments,
       pagination,
       "Lấy danh sách appointment theo technician thành công"
@@ -1102,15 +1102,11 @@ exports.validateAppointmentRules = async ({
   const newStart = buildLocalDateTime(appoinment_date, appoinment_time);
   const newEnd = new Date(
     newStart.getTime() +
-    parseDurationToMs(serviceType.estimated_duration) +
-    BUFFER_MS
+      parseDurationToMs(serviceType.estimated_duration) +
+      BUFFER_MS
   );
 
-  const activeStatuses = [
-    "pending",
-    "in_progress",
-
-  ];
+  const activeStatuses = ["pending", "in_progress"];
   const finishedStatuses = ["completed", "cancelled"];
 
   // Check trùng hoàn toàn
@@ -1169,8 +1165,8 @@ exports.validateAppointmentRules = async ({
     );
     const existingEnd = new Date(
       existingStart.getTime() +
-      parseDurationToMs(existingDurationStr) +
-      BUFFER_MS
+        parseDurationToMs(existingDurationStr) +
+        BUFFER_MS
     );
 
     const overlap =
@@ -1265,8 +1261,8 @@ exports.autoAssignTechnician = async ({
       const newStart = buildLocalDateTime(appoinment_date, appoinment_time);
       const newEnd = new Date(
         newStart.getTime() +
-        parseDurationToMs(serviceType.estimated_duration) +
-        BUFFER_MS
+          parseDurationToMs(serviceType.estimated_duration) +
+          BUFFER_MS
       );
 
       for (const existingAppt of conflictingAppointments) {
@@ -1289,8 +1285,8 @@ exports.autoAssignTechnician = async ({
 
         const existingEnd = new Date(
           existingStart.getTime() +
-          parseDurationToMs(existingDurationStr) +
-          BUFFER_MS
+            parseDurationToMs(existingDurationStr) +
+            BUFFER_MS
         );
 
         // Check overlap
@@ -1352,10 +1348,10 @@ exports.createDepositPayment = async (userId, appointmentId) => {
   let paymentResult = null;
   const paymentReq = {
     _id: userId,
-    body: { 
-      amount: depositAmount, 
+    body: {
+      amount: depositAmount,
       description,
-      timeoutSeconds: PAYMENT_EXPIRED_TIME // Truyền timeout từ constant (60 giây)
+      timeoutSeconds: PAYMENT_EXPIRED_TIME, // Truyền timeout từ constant (60 giây)
     },
   };
   const paymentRes = {
@@ -1541,8 +1537,8 @@ exports.createAppointment = async (req, res) => {
       const newStart = buildLocalDateTime(appoinment_date, appoinment_time);
       const newEnd = new Date(
         newStart.getTime() +
-        parseDurationToMs(serviceType.estimated_duration) +
-        BUFFER_MS
+          parseDurationToMs(serviceType.estimated_duration) +
+          BUFFER_MS
       );
 
       for (const existingAppt of conflictingAppointments) {
@@ -1565,8 +1561,8 @@ exports.createAppointment = async (req, res) => {
 
         const existingEnd = new Date(
           existingStart.getTime() +
-          parseDurationToMs(existingDurationStr) +
-          BUFFER_MS
+            parseDurationToMs(existingDurationStr) +
+            BUFFER_MS
         );
 
         const overlap =
