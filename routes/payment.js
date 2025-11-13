@@ -320,6 +320,48 @@ router.post("/webhook/payos", payment.handlePayOSWebhook);
 
 /**
  * @swagger
+ * /api/payment/success:
+ *   get:
+ *     summary: PayOS success redirect handler
+ *     tags: [Payments]
+ *     parameters:
+ *       - in: query
+ *         name: orderCode
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Order code from PayOS
+ *     responses:
+ *       302:
+ *         description: Redirect to frontend success page
+ *       400:
+ *         description: Missing orderCode
+ */
+router.get("/success", payment.paymentSuccess);
+
+/**
+ * @swagger
+ * /api/payment/cancel:
+ *   get:
+ *     summary: PayOS cancel redirect handler
+ *     tags: [Payments]
+ *     parameters:
+ *       - in: query
+ *         name: orderCode
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Order code from PayOS
+ *     responses:
+ *       302:
+ *         description: Redirect to frontend cancel page
+ *       400:
+ *         description: Missing orderCode
+ */
+router.get("/cancel", payment.paymentCancel);
+
+/**
+ * @swagger
  * /api/payment/retry/{id}:
  *   get:
  *     summary: Retry failed payment by payment ID

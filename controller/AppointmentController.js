@@ -459,16 +459,20 @@ exports.assignTechnician = async (req, res) => {
       )
       .lean();
 
-    // Emit socket event to customer room
+    // Emit socket event to customer and technician rooms
     try {
       const io = req.app.get("io");
-      if (io && updatedAppointment?.user_id?._id) {
-        io
-          .to(updatedAppointment.user_id._id.toString())
-          .emit("appointment_updated", {
-            appointment_id: updatedAppointment._id,
-            status: updatedAppointment.status,
-          });
+      if (io) {
+        const payload = {
+          appointment_id: updatedAppointment._id,
+          status: updatedAppointment.status,
+        };
+        if (updatedAppointment?.user_id?._id) {
+          io.to(updatedAppointment.user_id._id.toString()).emit("appointment_updated", payload);
+        }
+        if (updatedAppointment?.technician_id?._id) {
+          io.to(updatedAppointment.technician_id._id.toString()).emit("appointment_updated", payload);
+        }
       }
     } catch (e) {
       console.error("Socket emit error (assignTechnician):", e?.message || e);
@@ -649,16 +653,21 @@ exports.updateAppointmentStatus = async (req, res) => {
       .populate("vehicle_id", "license_plate brand model year")
       .lean();
 
-    // Emit socket event to customer room
+    // Emit socket event to customer and technician rooms
     try {
       const io = req.app.get("io");
-      if (io && updatedAppointment?.user_id?._id) {
-        io
-          .to(updatedAppointment.user_id._id.toString())
-          .emit("appointment_updated", {
-            appointment_id: updatedAppointment._id,
-            status: updatedAppointment.status,
-          });
+      if (io) {
+        const payload = {
+          appointment_id: updatedAppointment._id,
+          status: updatedAppointment.status,
+        };
+        if (updatedAppointment?.user_id?._id) {
+          io.to(updatedAppointment.user_id._id.toString()).emit("appointment_updated", payload);
+        }
+        if (updatedAppointment?.technician_id) {
+          const techId = updatedAppointment.technician_id?._id || updatedAppointment.technician_id;
+          if (techId) io.to(techId.toString()).emit("appointment_updated", payload);
+        }
       }
     } catch (e) {
       console.error(

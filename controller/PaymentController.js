@@ -286,7 +286,7 @@ exports.updatePaymentStatus = async (req, res) => {
         }
       );
 
-      // Emit socket events to affected customers
+      // Emit socket events to affected customers and technicians
       try {
         const io = req.app.get("io");
         if (io) {
@@ -296,14 +296,22 @@ exports.updatePaymentStatus = async (req, res) => {
               { final_payment_id: payment._id },
             ],
           })
-            .select("_id status user_id")
+            .select("_id status user_id technician_id")
             .populate("user_id", "_id")
+            .populate("technician_id", "_id")
             .lean();
 
           affected.forEach((appt) => {
             const room = appt?.user_id?._id?.toString();
             if (room) {
               io.to(room).emit("appointment_updated", {
+                appointment_id: appt._id,
+                status: appt.status,
+              });
+            }
+            const techRoom = appt?.technician_id?._id?.toString();
+            if (techRoom) {
+              io.to(techRoom).emit("appointment_updated", {
                 appointment_id: appt._id,
                 status: appt.status,
               });
@@ -403,7 +411,7 @@ exports.getPaymentTransaction = async (req, res) => {
             { status: "completed" }
           );
 
-          // Emit socket events to affected customers
+          // Emit socket events to affected customers and technicians
           try {
             const io = req.app.get("io");
             if (io) {
@@ -413,14 +421,22 @@ exports.getPaymentTransaction = async (req, res) => {
                   { final_payment_id: payment._id },
                 ],
               })
-                .select("_id status user_id")
+                .select("_id status user_id technician_id")
                 .populate("user_id", "_id")
+                .populate("technician_id", "_id")
                 .lean();
 
               affected.forEach((appt) => {
                 const room = appt?.user_id?._id?.toString();
                 if (room) {
                   io.to(room).emit("appointment_updated", {
+                    appointment_id: appt._id,
+                    status: appt.status,
+                  });
+                }
+                const techRoom = appt?.technician_id?._id?.toString();
+                if (techRoom) {
+                  io.to(techRoom).emit("appointment_updated", {
                     appointment_id: appt._id,
                     status: appt.status,
                   });
@@ -691,7 +707,7 @@ exports.handlePayOSWebhook = async (req, res) => {
           }
         );
 
-        // Emit socket events to affected customers
+        // Emit socket events to affected customers and technicians
         try {
           const io = req.app.get("io");
           if (io) {
@@ -701,14 +717,22 @@ exports.handlePayOSWebhook = async (req, res) => {
                 { final_payment_id: updatedPayment._id },
               ],
             })
-              .select("_id status user_id")
+              .select("_id status user_id technician_id")
               .populate("user_id", "_id")
+              .populate("technician_id", "_id")
               .lean();
 
             affected.forEach((appt) => {
               const room = appt?.user_id?._id?.toString();
               if (room) {
                 io.to(room).emit("appointment_updated", {
+                  appointment_id: appt._id,
+                  status: appt.status,
+                });
+              }
+              const techRoom = appt?.technician_id?._id?.toString();
+              if (techRoom) {
+                io.to(techRoom).emit("appointment_updated", {
                   appointment_id: appt._id,
                   status: appt.status,
                 });

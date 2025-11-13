@@ -273,6 +273,23 @@ exports.createChecklist = async (req, res) => {
     appointment.check_in_time = new Date();
     await appointment.save();
 
+    // Emit socket event to notify customer and technician rooms
+    try {
+      const io = req.app.get("io");
+      if (io) {
+        const customerRoom = appointment.user_id?.toString();
+        const technicianRoom = appointment.technician_id?.toString();
+        const payload = {
+          appointment_id: appointment._id,
+          status: appointment.status,
+        };
+        if (customerRoom) io.to(customerRoom).emit("appointment_updated", payload);
+        if (technicianRoom) io.to(technicianRoom).emit("appointment_updated", payload);
+      }
+    } catch (e) {
+      console.error("Socket emit error (createChecklist):", e?.message || e);
+    }
+
     // Populate checklist với thông tin đầy đủ
     await checklist.populate([
       { path: "issue_type_id" },
@@ -440,6 +457,23 @@ exports.acceptChecklist = async (req, res) => {
       status: "in_progress",
     });
 
+    // Emit socket event on status change -> in_progress
+    try {
+      const io = req.app.get("io");
+      if (io) {
+        const customerRoom = appointment.user_id?.toString();
+        const technicianRoom = appointment.technician_id?.toString();
+        const payload = {
+          appointment_id: appointment._id,
+          status: "in_progress",
+        };
+        if (customerRoom) io.to(customerRoom).emit("appointment_updated", payload);
+        if (technicianRoom) io.to(technicianRoom).emit("appointment_updated", payload);
+      }
+    } catch (e) {
+      console.error("Socket emit error (acceptChecklist):", e?.message || e);
+    }
+
     // Reload checklist với populate để có đầy đủ thông tin
     const updatedChecklist = await Checklist.findById(checklistId)
       .populate("issue_type_id")
@@ -584,6 +618,24 @@ exports.completeChecklist = async (req, res) => {
     await Appointment.findByIdAndUpdate(checklist.appointment_id._id, {
       status: "repaired",
     });
+
+    // Emit socket event on status change -> repaired
+    try {
+      const io = req.app.get("io");
+      if (io) {
+        const appt = checklist.appointment_id;
+        const customerRoom = appt?.user_id?.toString();
+        const technicianRoom = appt?.technician_id?.toString();
+        const payload = {
+          appointment_id: appt?._id,
+          status: "repaired",
+        };
+        if (customerRoom) io.to(customerRoom).emit("appointment_updated", payload);
+        if (technicianRoom) io.to(technicianRoom).emit("appointment_updated", payload);
+      }
+    } catch (e) {
+      console.error("Socket emit error (completeChecklist):", e?.message || e);
+    }
 
     await checklist.populate([
       { path: "issue_type_id" },
