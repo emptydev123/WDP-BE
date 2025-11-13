@@ -1102,8 +1102,8 @@ exports.validateAppointmentRules = async ({
   const newStart = buildLocalDateTime(appoinment_date, appoinment_time);
   const newEnd = new Date(
     newStart.getTime() +
-      parseDurationToMs(serviceType.estimated_duration) +
-      BUFFER_MS
+    parseDurationToMs(serviceType.estimated_duration) +
+    BUFFER_MS
   );
 
   const activeStatuses = ["pending", "in_progress"];
@@ -1165,8 +1165,8 @@ exports.validateAppointmentRules = async ({
     );
     const existingEnd = new Date(
       existingStart.getTime() +
-        parseDurationToMs(existingDurationStr) +
-        BUFFER_MS
+      parseDurationToMs(existingDurationStr) +
+      BUFFER_MS
     );
 
     const overlap =
@@ -1256,13 +1256,11 @@ exports.autoAssignTechnician = async ({
 
       // Kiểm tra overlap thời gian
       let hasConflict = false;
-      const BUFFER_MS = 5 * 60 * 1000; // 5 phút buffer
 
       const newStart = buildLocalDateTime(appoinment_date, appoinment_time);
       const newEnd = new Date(
         newStart.getTime() +
-          parseDurationToMs(serviceType.estimated_duration) +
-          BUFFER_MS
+        parseDurationToMs(serviceType.estimated_duration)
       );
 
       for (const existingAppt of conflictingAppointments) {
@@ -1283,17 +1281,16 @@ exports.autoAssignTechnician = async ({
           existingAppt.estimated_duration ||
           "0";
 
+        // Tính thời gian kết thúc của lịch cũ (không cộng buffer để cho phép đặt lịch tiếp theo ngay)
         const existingEnd = new Date(
           existingStart.getTime() +
-            parseDurationToMs(existingDurationStr) +
-            BUFFER_MS
+          parseDurationToMs(existingDurationStr)
         );
 
-        // Check overlap
+        // Overlap nếu: lịch mới bắt đầu trước khi lịch cũ kết thúc HOẶC lịch mới kết thúc sau khi lịch cũ bắt đầu
+        // Cho phép đặt lịch mới ngay khi lịch cũ kết thúc (newStart >= existingEnd)
         const overlap =
-          (newStart >= existingStart && newStart < existingEnd) ||
-          (newEnd > existingStart && newEnd <= existingEnd) ||
-          (newStart <= existingStart && newEnd >= existingEnd);
+          (newStart < existingEnd && newEnd > existingStart);
 
         if (overlap) {
           hasConflict = true;
@@ -1533,12 +1530,10 @@ exports.createAppointment = async (req, res) => {
         .populate("service_type_id")
         .lean();
 
-      const BUFFER_MS = 60 * 1000;
       const newStart = buildLocalDateTime(appoinment_date, appoinment_time);
       const newEnd = new Date(
         newStart.getTime() +
-          parseDurationToMs(serviceType.estimated_duration) +
-          BUFFER_MS
+        parseDurationToMs(serviceType.estimated_duration)
       );
 
       for (const existingAppt of conflictingAppointments) {
@@ -1559,16 +1554,16 @@ exports.createAppointment = async (req, res) => {
           existingAppt.estimated_duration ||
           "0";
 
+        // Tính thời gian kết thúc của lịch cũ (không cộng buffer để cho phép đặt lịch tiếp theo ngay)
         const existingEnd = new Date(
           existingStart.getTime() +
-            parseDurationToMs(existingDurationStr) +
-            BUFFER_MS
+          parseDurationToMs(existingDurationStr)
         );
 
+        // Overlap nếu: lịch mới bắt đầu trước khi lịch cũ kết thúc HOẶC lịch mới kết thúc sau khi lịch cũ bắt đầu
+        // Cho phép đặt lịch mới ngay khi lịch cũ kết thúc (newStart >= existingEnd)
         const overlap =
-          (newStart >= existingStart && newStart < existingEnd) ||
-          (newEnd > existingStart && newEnd <= existingEnd) ||
-          (newStart <= existingStart && newEnd >= existingEnd);
+          (newStart < existingEnd && newEnd > existingStart);
 
         if (overlap) {
           return res.status(400).json({
