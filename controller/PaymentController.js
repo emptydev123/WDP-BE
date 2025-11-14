@@ -37,7 +37,10 @@ function deriveStatus(body) {
   if (["CANCELED", "CANCELLED"].includes(s)) return "CANCELLED";
   if (["FAILED", "FAIL", "01"].includes(s)) return "FAILED";
   if (["REFUNDED", "REFUND"].includes(s)) return "REFUNDED";
-  return "UNKNOWN";
+  if (["TIMEOUT"].includes(s)) return "TIMEOUT";
+  if (["EXPIRED"].includes(s)) return "EXPIRED";
+  if (["PENDING"].includes(s)) return "PENDING";
+  return "PENDING"; // Default to PENDING instead of UNKNOWN
 }
 
 function isTimeout(payment) {
@@ -382,6 +385,17 @@ exports.getPaymentTransaction = async (req, res) => {
       });
     }
 
+    // Check timeout first before querying PayOS
+    if (payment.status === "PENDING" && isTimeout(payment)) {
+      // Update to TIMEOUT if pending and expired
+      await Payment.updateOne(
+        { _id: payment._id },
+        { $set: { status: "TIMEOUT", updatedAt: new Date() } }
+      );
+      payment.status = "TIMEOUT";
+      payment.updatedAt = new Date();
+    }
+
     // Fallback: query PayOS and synchronize status to DB if webhook missed
     try {
       const transactionInfo = await payOS.paymentRequests.get(
@@ -391,8 +405,8 @@ exports.getPaymentTransaction = async (req, res) => {
       console.log("getPaymentTransaction - PayOS info:", {
         status: derived,
       });
-      if (derived && derived !== payment.status) {
-        // Update DB to reflect latest PayOS status
+      if (derived && derived !== payment.status && payment.status !== "TIMEOUT") {
+        // Update DB to reflect latest PayOS status (but don't override TIMEOUT)
         const update = { status: derived, updatedAt: new Date() };
         if (derived === "PAID") update.paidAt = new Date();
         await Payment.updateOne(
