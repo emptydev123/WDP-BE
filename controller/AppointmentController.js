@@ -64,14 +64,13 @@ exports.getAppointments = async (req, res) => {
         "assigned",
         "check_in",
         "in_progress",
-        "repaired",
         "completed",
         "canceled",
       ];
       if (!validStatuses.includes(status)) {
         return res.status(400).json({
           message:
-            "Status không hợp lệ. Chỉ chấp nhận: pending, assigned, check_in, in_progress, repaired, completed, canceled",
+            "Status không hợp lệ. Chỉ chấp nhận: pending, assigned, check_in, in_progress, completed, canceled",
           success: false,
         });
       }
@@ -245,7 +244,7 @@ exports.getTechnicianSchedule = async (req, res) => {
           $lte: toDate,
         },
         status: {
-          $in: ["assigned", "check_in", "in_progress", "repaired", "completed"],
+          $in: ["assigned", "check_in", "in_progress", "completed"],
         },
       })
         .populate("user_id", "fullName phoneNumber")
@@ -308,13 +307,7 @@ exports.getTechnicianSchedule = async (req, res) => {
             $lte: toDate,
           },
           status: {
-            $in: [
-              "assigned",
-              "check_in",
-              "in_progress",
-              "repaired",
-              "completed",
-            ],
+            $in: ["assigned", "check_in", "in_progress", "completed"],
           },
         })
           .populate("user_id", "fullName phoneNumber")
@@ -468,10 +461,16 @@ exports.assignTechnician = async (req, res) => {
           status: updatedAppointment.status,
         };
         if (updatedAppointment?.user_id?._id) {
-          io.to(updatedAppointment.user_id._id.toString()).emit("appointment_updated", payload);
+          io.to(updatedAppointment.user_id._id.toString()).emit(
+            "appointment_updated",
+            payload
+          );
         }
         if (updatedAppointment?.technician_id?._id) {
-          io.to(updatedAppointment.technician_id._id.toString()).emit("appointment_updated", payload);
+          io.to(updatedAppointment.technician_id._id.toString()).emit(
+            "appointment_updated",
+            payload
+          );
         }
       }
     } catch (e) {
@@ -518,14 +517,13 @@ exports.getMyAppointments = async (req, res) => {
         "assigned",
         "check_in",
         "in_progress",
-        "repaired",
         "completed",
         "canceled",
       ];
       if (!validStatuses.includes(status)) {
         return res.status(400).json({
           message:
-            "Status không hợp lệ. Chỉ chấp nhận: pending, assigned, check_in, in_progress, repaired, completed, canceled",
+            "Status không hợp lệ. Chỉ chấp nhận: pending, assigned, check_in, in_progress, completed, canceled",
           success: false,
         });
       }
@@ -598,7 +596,6 @@ exports.updateAppointmentStatus = async (req, res) => {
       "assigned",
       "check_in",
       "in_progress",
-      "repaired",
       "completed",
       "delay",
       "canceled",
@@ -606,7 +603,7 @@ exports.updateAppointmentStatus = async (req, res) => {
     if (!validStatuses.includes(status)) {
       return res.status(400).json({
         message:
-          "Status không hợp lệ. Chỉ chấp nhận: pending, assigned, check_in, in_progress, repaired, completed, delay, canceled",
+          "Status không hợp lệ. Chỉ chấp nhận: pending, assigned, check_in, in_progress, completed, delay, canceled",
         success: false,
       });
     }
@@ -662,11 +659,17 @@ exports.updateAppointmentStatus = async (req, res) => {
           status: updatedAppointment.status,
         };
         if (updatedAppointment?.user_id?._id) {
-          io.to(updatedAppointment.user_id._id.toString()).emit("appointment_updated", payload);
+          io.to(updatedAppointment.user_id._id.toString()).emit(
+            "appointment_updated",
+            payload
+          );
         }
         if (updatedAppointment?.technician_id) {
-          const techId = updatedAppointment.technician_id?._id || updatedAppointment.technician_id;
-          if (techId) io.to(techId.toString()).emit("appointment_updated", payload);
+          const techId =
+            updatedAppointment.technician_id?._id ||
+            updatedAppointment.technician_id;
+          if (techId)
+            io.to(techId.toString()).emit("appointment_updated", payload);
         }
       }
     } catch (e) {
@@ -779,14 +782,13 @@ exports.getAppointmentsByUsername = async (req, res) => {
         "assigned",
         "check_in",
         "in_progress",
-        "repaired",
         "completed",
         "canceled",
       ];
       if (!validStatuses.includes(status)) {
         return res.status(400).json({
           message:
-            "Status không hợp lệ. Chỉ chấp nhận: pending, assigned, check_in, in_progress, repaired, completed, canceled",
+            "Status không hợp lệ. Chỉ chấp nhận: pending, assigned, check_in, in_progress, completed, canceled",
           success: false,
         });
       }
@@ -873,14 +875,13 @@ exports.getAppointmentsByTechnician = async (req, res) => {
         "assigned",
         "check_in",
         "in_progress",
-        "repaired",
         "completed",
         "canceled",
       ];
       if (!validStatuses.includes(status)) {
         return res.status(400).json({
           message:
-            "Status không hợp lệ. Chỉ chấp nhận: pending, assigned, check_in, in_progress, repaired, completed, canceled",
+            "Status không hợp lệ. Chỉ chấp nhận: pending, assigned, check_in, in_progress, completed, canceled",
           success: false,
         });
       }
@@ -1005,10 +1006,19 @@ exports.createFinalPayment = async (req, res) => {
       });
     }
 
-    if (appointment.status !== "repaired") {
+    if (appointment.status !== "check_in") {
       return res.status(400).json({
         message:
-          "Chỉ có thể tạo final payment cho appointment đã sửa chữa xong",
+          "Chỉ có thể tạo final payment cho appointment đã được check-in và đã báo giá",
+        success: false,
+      });
+    }
+
+    // Kiểm tra đã có final_cost chưa (đã báo giá)
+    if (!appointment.final_cost || appointment.final_cost <= 0) {
+      return res.status(400).json({
+        message:
+          "Appointment chưa được báo giá. Vui lòng chấp nhận checklist trước.",
         success: false,
       });
     }
@@ -1020,11 +1030,11 @@ exports.createFinalPayment = async (req, res) => {
       });
     }
 
-    const remainingAmount = appointment.final_cost || 0;
+    const finalAmount = appointment.final_cost || 0;
 
-    if (remainingAmount <= 0) {
+    if (finalAmount <= 0) {
       return res.status(400).json({
-        message: "Không cần thanh toán thêm (đã thanh toán đủ)",
+        message: "Không có số tiền cần thanh toán",
         success: false,
       });
     }
@@ -1036,8 +1046,9 @@ exports.createFinalPayment = async (req, res) => {
     const paymentReq = {
       _id: appointment.user_id._id.toString(),
       body: {
-        amount: remainingAmount,
+        amount: finalAmount,
         description: finalPaymentDescription,
+        timeoutSeconds: PAYMENT_EXPIRED_TIME,
       },
     };
 
@@ -1058,7 +1069,7 @@ exports.createFinalPayment = async (req, res) => {
       const orderCode = Date.now();
       const fallbackPayment = new Payment({
         orderCode: orderCode,
-        amount: remainingAmount,
+        amount: finalAmount,
         description: finalPaymentDescription,
         status: "PENDING",
         user_id: appointment.user_id._id,
@@ -1144,8 +1155,8 @@ exports.validateAppointmentRules = async ({
   const newStart = buildLocalDateTime(appoinment_date, appoinment_time);
   const newEnd = new Date(
     newStart.getTime() +
-    parseDurationToMs(serviceType.estimated_duration) +
-    BUFFER_MS
+      parseDurationToMs(serviceType.estimated_duration) +
+      BUFFER_MS
   );
 
   const activeStatuses = ["pending", "in_progress"];
@@ -1207,8 +1218,8 @@ exports.validateAppointmentRules = async ({
     );
     const existingEnd = new Date(
       existingStart.getTime() +
-      parseDurationToMs(existingDurationStr) +
-      BUFFER_MS
+        parseDurationToMs(existingDurationStr) +
+        BUFFER_MS
     );
 
     const overlap =
@@ -1301,8 +1312,7 @@ exports.autoAssignTechnician = async ({
 
       const newStart = buildLocalDateTime(appoinment_date, appoinment_time);
       const newEnd = new Date(
-        newStart.getTime() +
-        parseDurationToMs(serviceType.estimated_duration)
+        newStart.getTime() + parseDurationToMs(serviceType.estimated_duration)
       );
 
       for (const existingAppt of conflictingAppointments) {
@@ -1325,14 +1335,12 @@ exports.autoAssignTechnician = async ({
 
         // Tính thời gian kết thúc của lịch cũ (không cộng buffer để cho phép đặt lịch tiếp theo ngay)
         const existingEnd = new Date(
-          existingStart.getTime() +
-          parseDurationToMs(existingDurationStr)
+          existingStart.getTime() + parseDurationToMs(existingDurationStr)
         );
 
         // Overlap nếu: lịch mới bắt đầu trước khi lịch cũ kết thúc HOẶC lịch mới kết thúc sau khi lịch cũ bắt đầu
         // Cho phép đặt lịch mới ngay khi lịch cũ kết thúc (newStart >= existingEnd)
-        const overlap =
-          (newStart < existingEnd && newEnd > existingStart);
+        const overlap = newStart < existingEnd && newEnd > existingStart;
 
         if (overlap) {
           hasConflict = true;
@@ -1483,14 +1491,7 @@ exports.createAppointment = async (req, res) => {
     const existingAppointments = await Appointment.find({
       user_id,
       status: {
-        $in: [
-          "pending",
-          "assigned",
-          "check_in",
-          "in_progress",
-          "repaired",
-          "completed",
-        ],
+        $in: ["pending", "assigned", "check_in", "in_progress", "completed"],
       },
     }).populate("service_type_id center_id vehicle_id");
 
@@ -1574,8 +1575,7 @@ exports.createAppointment = async (req, res) => {
 
       const newStart = buildLocalDateTime(appoinment_date, appoinment_time);
       const newEnd = new Date(
-        newStart.getTime() +
-        parseDurationToMs(serviceType.estimated_duration)
+        newStart.getTime() + parseDurationToMs(serviceType.estimated_duration)
       );
 
       for (const existingAppt of conflictingAppointments) {
@@ -1598,14 +1598,12 @@ exports.createAppointment = async (req, res) => {
 
         // Tính thời gian kết thúc của lịch cũ (không cộng buffer để cho phép đặt lịch tiếp theo ngay)
         const existingEnd = new Date(
-          existingStart.getTime() +
-          parseDurationToMs(existingDurationStr)
+          existingStart.getTime() + parseDurationToMs(existingDurationStr)
         );
 
         // Overlap nếu: lịch mới bắt đầu trước khi lịch cũ kết thúc HOẶC lịch mới kết thúc sau khi lịch cũ bắt đầu
         // Cho phép đặt lịch mới ngay khi lịch cũ kết thúc (newStart >= existingEnd)
-        const overlap =
-          (newStart < existingEnd && newEnd > existingStart);
+        const overlap = newStart < existingEnd && newEnd > existingStart;
 
         if (overlap) {
           return res.status(400).json({

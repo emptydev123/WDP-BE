@@ -279,32 +279,88 @@ exports.updatePaymentStatus = async (req, res) => {
       );
 
       // Cập nhật appointment với final payment (final_payment_id)
-      await Appointment.updateMany(
-        {
-          final_payment_id: payment._id,
-          status: "repaired", // Chỉ cập nhật appointment đã repaired
-        },
-        {
-          status: "completed", // Cập nhật status thành completed khi đã thanh toán final payment
-        }
-      );
+      // Khi thanh toán final payment thành công: cập nhật inventory và chuyển status thành "in_progress"
+      const appointmentsWithFinalPayment = await Appointment.find({
+        final_payment_id: payment._id,
+        status: "check_in", // Chỉ cập nhật appointment đang check_in (đã báo giá)
+      }).populate("center_id");
 
-      // Emit socket events to affected customers and technicians
+      for (const appt of appointmentsWithFinalPayment) {
+        // Tìm checklist của appointment này
+        const Checklist = require("../model/checklist");
+        const Inventory = require("../model/inventory");
+        const checklist = await Checklist.findOne({
+          appointment_id: appt._id,
+          status: "accepted",
+        }).populate("parts.part_id");
+
+        if (checklist && checklist.parts && checklist.parts.length > 0) {
+          // Cập nhật inventory (trừ số lượng parts)
+          for (const part of checklist.parts) {
+            const partId = part.part_id?._id || part.part_id;
+            const inventory = await Inventory.findOne({
+              part_id: partId,
+              center_id: appt.center_id,
+            });
+
+            if (inventory) {
+              const currentQuantity =
+                inventory.quantity_avaiable || inventory.quantity || 0;
+
+              if (currentQuantity >= part.quantity) {
+                await Inventory.findByIdAndUpdate(inventory._id, {
+                  $inc: { quantity_avaiable: -part.quantity },
+                });
+                console.log(
+                  `✅ Updated inventory ${inventory._id} for part ${partId}: -${part.quantity}`
+                );
+              } else {
+                console.error(
+                  `⚠️ Không đủ hàng trong kho cho part: ${partId}. Có: ${currentQuantity}, Cần: ${part.quantity}`
+                );
+              }
+            }
+          }
+        }
+
+        // Chuyển appointment status thành "in_progress"
+        appt.status = "in_progress";
+        await appt.save();
+
+        // Emit socket event cho appointment này
+        try {
+          const io = req.app.get("io");
+          if (io) {
+            const customerRoom = appt.user_id?.toString();
+            const technicianRoom = appt.technician_id?.toString();
+            const payload = {
+              appointment_id: appt._id,
+              status: "in_progress",
+            };
+            if (customerRoom)
+              io.to(customerRoom).emit("appointment_updated", payload);
+            if (technicianRoom)
+              io.to(technicianRoom).emit("appointment_updated", payload);
+          }
+        } catch (e) {
+          console.error("Socket emit error (final payment):", e?.message || e);
+        }
+      }
+
+      // Emit socket events cho deposit payment
       try {
         const io = req.app.get("io");
         if (io) {
-          const affected = await Appointment.find({
-            $or: [
-              { payment_id: payment._id },
-              { final_payment_id: payment._id },
-            ],
+          const depositAppointments = await Appointment.find({
+            payment_id: payment._id,
+            status: "assigned",
           })
             .select("_id status user_id technician_id")
             .populate("user_id", "_id")
             .populate("technician_id", "_id")
             .lean();
 
-          affected.forEach((appt) => {
+          depositAppointments.forEach((appt) => {
             const room = appt?.user_id?._id?.toString();
             if (room) {
               io.to(room).emit("appointment_updated", {
@@ -322,7 +378,10 @@ exports.updatePaymentStatus = async (req, res) => {
           });
         }
       } catch (e) {
-        console.error("Socket emit error (updatePaymentStatus):", e?.message || e);
+        console.error(
+          "Socket emit error (updatePaymentStatus):",
+          e?.message || e
+        );
       }
     }
 
@@ -405,14 +464,15 @@ exports.getPaymentTransaction = async (req, res) => {
       console.log("getPaymentTransaction - PayOS info:", {
         status: derived,
       });
-      if (derived && derived !== payment.status && payment.status !== "TIMEOUT") {
+      if (
+        derived &&
+        derived !== payment.status &&
+        payment.status !== "TIMEOUT"
+      ) {
         // Update DB to reflect latest PayOS status (but don't override TIMEOUT)
         const update = { status: derived, updatedAt: new Date() };
         if (derived === "PAID") update.paidAt = new Date();
-        await Payment.updateOne(
-          { _id: payment._id },
-          { $set: update }
-        );
+        await Payment.updateOne({ _id: payment._id }, { $set: update });
 
         // Also update related appointment statuses when paid
         if (derived === "PAID") {
@@ -420,27 +480,89 @@ exports.getPaymentTransaction = async (req, res) => {
             { payment_id: payment._id, status: "pending" },
             { status: "assigned" }
           );
-          await Appointment.updateMany(
-            { final_payment_id: payment._id, status: "repaired" },
-            { status: "completed" }
-          );
 
-          // Emit socket events to affected customers and technicians
+          // Xử lý final payment: cập nhật inventory và chuyển status thành "in_progress"
+          const Checklist = require("../model/checklist");
+          const Inventory = require("../model/inventory");
+          const appointmentsWithFinalPayment = await Appointment.find({
+            final_payment_id: payment._id,
+            status: "check_in",
+          }).populate("center_id");
+
+          for (const appt of appointmentsWithFinalPayment) {
+            const checklist = await Checklist.findOne({
+              appointment_id: appt._id,
+              status: "accepted",
+            }).populate("parts.part_id");
+
+            if (checklist && checklist.parts && checklist.parts.length > 0) {
+              for (const part of checklist.parts) {
+                const partId = part.part_id?._id || part.part_id;
+                const inventory = await Inventory.findOne({
+                  part_id: partId,
+                  center_id: appt.center_id,
+                });
+
+                if (inventory) {
+                  const currentQuantity =
+                    inventory.quantity_avaiable || inventory.quantity || 0;
+
+                  if (currentQuantity >= part.quantity) {
+                    await Inventory.findByIdAndUpdate(inventory._id, {
+                      $inc: { quantity_avaiable: -part.quantity },
+                    });
+                    console.log(
+                      `✅ Updated inventory ${inventory._id} for part ${partId}: -${part.quantity}`
+                    );
+                  } else {
+                    console.error(
+                      `⚠️ Không đủ hàng trong kho cho part: ${partId}. Có: ${currentQuantity}, Cần: ${part.quantity}`
+                    );
+                  }
+                }
+              }
+            }
+
+            appt.status = "in_progress";
+            await appt.save();
+
+            // Emit socket event cho appointment này
+            try {
+              const io = req.app.get("io");
+              if (io) {
+                const customerRoom = appt.user_id?.toString();
+                const technicianRoom = appt.technician_id?.toString();
+                const payload = {
+                  appointment_id: appt._id,
+                  status: "in_progress",
+                };
+                if (customerRoom)
+                  io.to(customerRoom).emit("appointment_updated", payload);
+                if (technicianRoom)
+                  io.to(technicianRoom).emit("appointment_updated", payload);
+              }
+            } catch (e) {
+              console.error(
+                "Socket emit error (final payment getTransaction):",
+                e?.message || e
+              );
+            }
+          }
+
+          // Emit socket events cho deposit payment
           try {
             const io = req.app.get("io");
             if (io) {
-              const affected = await Appointment.find({
-                $or: [
-                  { payment_id: payment._id },
-                  { final_payment_id: payment._id },
-                ],
+              const depositAppointments = await Appointment.find({
+                payment_id: payment._id,
+                status: "assigned",
               })
                 .select("_id status user_id technician_id")
                 .populate("user_id", "_id")
                 .populate("technician_id", "_id")
                 .lean();
 
-              affected.forEach((appt) => {
+              depositAppointments.forEach((appt) => {
                 const room = appt?.user_id?._id?.toString();
                 if (room) {
                   io.to(room).emit("appointment_updated", {
@@ -458,7 +580,10 @@ exports.getPaymentTransaction = async (req, res) => {
               });
             }
           } catch (e) {
-            console.error("Socket emit error (getPaymentTransaction):", e?.message || e);
+            console.error(
+              "Socket emit error (getPaymentTransaction):",
+              e?.message || e
+            );
           }
         }
 
@@ -711,32 +836,91 @@ exports.handlePayOSWebhook = async (req, res) => {
         );
 
         // Cập nhật appointment với final payment (final_payment_id)
-        await Appointment.updateMany(
-          {
-            final_payment_id: updatedPayment._id,
-            status: "repaired", // Chỉ cập nhật appointment đã repaired
-          },
-          {
-            status: "completed", // Cập nhật status thành completed khi đã thanh toán final payment
-          }
-        );
+        // Khi thanh toán final payment thành công: cập nhật inventory và chuyển status thành "in_progress"
+        const Checklist = require("../model/checklist");
+        const Inventory = require("../model/inventory");
+        const appointmentsWithFinalPayment = await Appointment.find({
+          final_payment_id: updatedPayment._id,
+          status: "check_in", // Chỉ cập nhật appointment đang check_in (đã báo giá)
+        }).populate("center_id");
 
-        // Emit socket events to affected customers and technicians
+        for (const appt of appointmentsWithFinalPayment) {
+          // Tìm checklist của appointment này
+          const checklist = await Checklist.findOne({
+            appointment_id: appt._id,
+            status: "accepted",
+          }).populate("parts.part_id");
+
+          if (checklist && checklist.parts && checklist.parts.length > 0) {
+            // Cập nhật inventory (trừ số lượng parts)
+            for (const part of checklist.parts) {
+              const partId = part.part_id?._id || part.part_id;
+              const inventory = await Inventory.findOne({
+                part_id: partId,
+                center_id: appt.center_id,
+              });
+
+              if (inventory) {
+                const currentQuantity =
+                  inventory.quantity_avaiable || inventory.quantity || 0;
+
+                if (currentQuantity >= part.quantity) {
+                  await Inventory.findByIdAndUpdate(inventory._id, {
+                    $inc: { quantity_avaiable: -part.quantity },
+                  });
+                  console.log(
+                    `✅ Updated inventory ${inventory._id} for part ${partId}: -${part.quantity}`
+                  );
+                } else {
+                  console.error(
+                    `⚠️ Không đủ hàng trong kho cho part: ${partId}. Có: ${currentQuantity}, Cần: ${part.quantity}`
+                  );
+                }
+              }
+            }
+          }
+
+          // Chuyển appointment status thành "in_progress"
+          appt.status = "in_progress";
+          await appt.save();
+
+          // Emit socket event cho appointment này
+          try {
+            const io = req.app.get("io");
+            if (io) {
+              const customerRoom = appt.user_id?.toString();
+              const technicianRoom = appt.technician_id?.toString();
+              const payload = {
+                appointment_id: appt._id,
+                status: "in_progress",
+              };
+              if (customerRoom)
+                io.to(customerRoom).emit("appointment_updated", payload);
+              if (technicianRoom)
+                io.to(technicianRoom).emit("appointment_updated", payload);
+            }
+          } catch (e) {
+            console.error(
+              "Socket emit error (final payment webhook):",
+              e?.message || e
+            );
+          }
+        }
+
+        // Emit socket events cho deposit payment
         try {
           const io = req.app.get("io");
           if (io) {
-            const affected = await Appointment.find({
-              $or: [
-                { payment_id: updatedPayment._id },
-                { final_payment_id: updatedPayment._id },
-              ],
+            const depositAppointments = await Appointment.find({
+              payment_id: updatedPayment._id,
+              status: "assigned",
             })
               .select("_id status user_id technician_id")
               .populate("user_id", "_id")
               .populate("technician_id", "_id")
               .lean();
 
-            affected.forEach((appt) => {
+            depositAppointments.forEach((appt) => {
               const room = appt?.user_id?._id?.toString();
               if (room) {
                 io.to(room).emit("appointment_updated", {
@@ -754,7 +938,10 @@ exports.handlePayOSWebhook = async (req, res) => {
             });
           }
         } catch (e) {
-          console.error("Socket emit error (handlePayOSWebhook):", e?.message || e);
+          console.error(
+            "Socket emit error (handlePayOSWebhook):",
+            e?.message || e
+          );
         }
       }
     }

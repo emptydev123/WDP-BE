@@ -84,9 +84,82 @@ router.get("/", authMiddleWare, ChecklistController.getAllChecklists);
 
 /**
  * @swagger
+ * /api/checklist/checkin:
+ *   post:
+ *     summary: Tạo checkin - ghi nhận tình trạng ban đầu của xe (Technician)
+ *     description: |
+ *       Khi customer đem xe tới, technician tạo checkin trước để ghi nhận tình trạng ban đầu của xe.
+ *       Sau khi tạo checkin thành công, appointment status sẽ được cập nhật thành "check_in".
+ *       Sau đó mới tiếp tục tạo checklist.
+ *     tags: [Checklist]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - appointment_id
+ *               - initial_vehicle_condition
+ *             properties:
+ *               appointment_id:
+ *                 type: string
+ *                 description: ID của appointment (phải có status "assigned" và chưa check-in)
+ *               initial_vehicle_condition:
+ *                 type: string
+ *                 description: Tình trạng ban đầu của xe khi checkin (trước khi khám xe)
+ *                 example: "Xe có vết xước nhẹ ở cánh cửa trước, bánh xe còn tốt, đèn pha hoạt động bình thường"
+ *     responses:
+ *       201:
+ *         description: Checkin created successfully, appointment status updated to "check_in"
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: "Tạo checkin thành công"
+ *                 success:
+ *                   type: boolean
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     appointment:
+ *                       type: object
+ *                       properties:
+ *                         _id:
+ *                           type: string
+ *                         status:
+ *                           type: string
+ *                           example: "check_in"
+ *                         initial_vehicle_condition:
+ *                           type: string
+ *                         checkin_datetime:
+ *                           type: string
+ *                           format: date-time
+ *                         checkin_by:
+ *                           type: object
+ *                           description: Thông tin technician đã check-in
+ *       400:
+ *         description: Bad request - Appointment status không phải "assigned" hoặc đã được check-in
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: Appointment không tồn tại
+ */
+router.post("/checkin", authMiddleWare, ChecklistController.createCheckin);
+
+/**
+ * @swagger
  * /api/checklist:
  *   post:
- *     summary: Tạo checklist mới và check-in appointment (Technician)
+ *     summary: Tạo checklist mới (Technician)
+ *     description: |
+ *       Tạo checklist sau khi đã checkin.
+ *       Appointment phải có status "check_in" trước khi tạo checklist.
  *     tags: [Checklist]
  *     security:
  *       - bearerAuth: []
@@ -104,7 +177,7 @@ router.get("/", authMiddleWare, ChecklistController.getAllChecklists);
  *             properties:
  *               appointment_id:
  *                 type: string
- *                 description: ID của appointment (phải có status "assigned" và chưa check-in)
+ *                 description: ID của appointment (phải có status "check_in" và đã được check-in)
  *               issue_type_id:
  *                 type: string
  *                 description: ID của issue type
@@ -132,7 +205,7 @@ router.get("/", authMiddleWare, ChecklistController.getAllChecklists);
  *                 description: Danh sách parts cần sử dụng (optional)
  *     responses:
  *       201:
- *         description: Checklist created successfully and appointment checked-in
+ *         description: Checklist created successfully
  *         content:
  *           application/json:
  *             schema:
@@ -140,14 +213,14 @@ router.get("/", authMiddleWare, ChecklistController.getAllChecklists);
  *               properties:
  *                 message:
  *                   type: string
- *                   example: "Tạo checklist và check-in thành công"
+ *                   example: "Tạo checklist thành công"
  *                 success:
  *                   type: boolean
  *                 data:
  *                   type: object
- *                   description: Checklist đã được tạo với appointment đã check-in
+ *                   description: Checklist đã được tạo với status "pending"
  *       400:
- *         description: Bad request - Appointment status không phải "assigned" hoặc đã được check-in
+ *         description: Bad request - Appointment chưa được check-in hoặc đã có checklist
  *       401:
  *         description: Unauthorized
  *       404:
@@ -159,8 +232,11 @@ router.post("/", authMiddleWare, ChecklistController.createChecklist);
  * @swagger
  * /api/checklist/{checklistId}/accept:
  *   put:
- *     summary: Staff chấp nhận checklist, cập nhật inventory và chuyển appointment status thành "in_progress"
- *     description: Khi staff chấp nhận checklist thành công, hệ thống sẽ cập nhật inventory, tính toán final_cost và tự động chuyển appointment status thành "in_progress"
+ *     summary: Staff chấp nhận checklist và báo giá
+ *     description: |
+ *       Khi staff chấp nhận checklist thành công:
+ *       - Nếu có phụ tùng (parts): Tính toán final_cost, checklist status = "accepted", appointment status vẫn là "check_in" (chờ thanh toán)
+ *       - Nếu không có phụ tùng: Checklist status = "accepted", appointment status chuyển thành "in_progress" ngay
  *     tags: [Checklist]
  *     security:
  *       - bearerAuth: []
@@ -173,7 +249,7 @@ router.post("/", authMiddleWare, ChecklistController.createChecklist);
  *         description: ID của checklist cần chấp nhận
  *     responses:
  *       200:
- *         description: Checklist accepted, inventory updated, appointment status changed to "in_progress"
+ *         description: Checklist accepted, price quoted
  *         content:
  *           application/json:
  *             schema:
@@ -181,12 +257,29 @@ router.post("/", authMiddleWare, ChecklistController.createChecklist);
  *               properties:
  *                 message:
  *                   type: string
- *                   example: "Chấp nhận checklist thành công"
+ *                   example: "Checklist đã được chấp nhận, đã báo giá" hoặc "Checklist đã được chấp nhận, đã chuyển sang in_progress (không có phụ tùng)"
  *                 success:
  *                   type: boolean
  *                 data:
  *                   type: object
- *                   description: Checklist đã được accept, appointment đã chuyển sang "in_progress"
+ *                   properties:
+ *                     checklist:
+ *                       type: object
+ *                       description: Checklist đã được accept
+ *                     totalCost:
+ *                       type: number
+ *                       description: Tổng chi phí (0 nếu không có parts)
+ *                     appointment:
+ *                       type: object
+ *                       properties:
+ *                         _id:
+ *                           type: string
+ *                         status:
+ *                           type: string
+ *                           example: "in_progress" hoặc "check_in"
+ *                           description: "in_progress" nếu không có parts, "check_in" nếu có parts (chờ thanh toán)
+ *                         final_cost:
+ *                           type: number
  *       400:
  *         description: Bad request - Checklist đã được xử lý hoặc không đủ inventory
  *       401:

@@ -53,7 +53,11 @@ router.get(
  * @swagger
  * /api/dashboard/top-brands:
  *   get:
- *     summary: Top 5 hãng xe sửa nhiều nhất (mặc định 3 tuần, có thể filter theo thời gian)
+ *     summary: Danh sách hãng xe sửa nhiều nhất (sắp xếp từ cao xuống thấp)
+ *     description: |
+ *       - Không truyền gì: Lấy tất cả danh sách hãng xe sắp xếp từ cao xuống thấp
+ *       - Có filter: Lọc và sắp xếp từ cao xuống thấp
+ *       - Nếu có vehicle_id: Lọc theo xe nào đến sửa nhiều nhất (theo vehicle_id)
  *     tags: [Dashboard]
  *     security:
  *       - bearerAuth: []
@@ -63,13 +67,13 @@ router.get(
  *         schema:
  *           type: string
  *           format: date
- *         description: Ngày bắt đầu (YYYY-MM-DD). Nếu không có, mặc định là 3 tuần trước
+ *         description: Ngày bắt đầu (YYYY-MM-DD). Nếu không có thì lấy tất cả
  *       - in: query
  *         name: date_to
  *         schema:
  *           type: string
  *           format: date
- *         description: Ngày kết thúc (YYYY-MM-DD). Nếu không có, mặc định là hôm nay
+ *         description: Ngày kết thúc (YYYY-MM-DD). Nếu không có thì lấy tất cả
  *       - in: query
  *         name: center_id
  *         schema:
@@ -79,11 +83,16 @@ router.get(
  *         name: status
  *         schema:
  *           type: string
- *           enum: [pending, assigned, check_in, in_progress, repaired, completed, canceled]
+ *           enum: [pending, assigned, check_in, in_progress, completed, canceled]
  *         description: Lọc theo trạng thái appointment. Nếu không truyền thì lấy tất cả
+ *       - in: query
+ *         name: vehicle_id
+ *         schema:
+ *           type: string
+ *         description: Lọc theo vehicle_id để xem xe nào đến sửa nhiều nhất
  *     responses:
  *       200:
- *         description: Top 5 hãng xe sửa nhiều nhất
+ *         description: Danh sách hãng xe hoặc xe sửa nhiều nhất (sắp xếp từ cao xuống thấp)
  */
 router.get(
   "/top-brands",
@@ -95,7 +104,10 @@ router.get(
  * @swagger
  * /api/dashboard/top-parts:
  *   get:
- *     summary: Top 5 phụ tùng thay nhiều nhất (mặc định tháng này, có thể filter theo thời gian)
+ *     summary: Danh sách phụ tùng thay nhiều nhất (sắp xếp từ cao xuống thấp)
+ *     description: |
+ *       - Không truyền gì: Lấy tất cả danh sách phụ tùng sắp xếp từ cao xuống thấp
+ *       - Có filter: Lọc và sắp xếp từ cao xuống thấp
  *     tags: [Dashboard]
  *     security:
  *       - bearerAuth: []
@@ -105,13 +117,13 @@ router.get(
  *         schema:
  *           type: string
  *           format: date
- *         description: Ngày bắt đầu (YYYY-MM-DD). Nếu không có, mặc định là đầu tháng này
+ *         description: Ngày bắt đầu (YYYY-MM-DD). Nếu không có thì lấy tất cả
  *       - in: query
  *         name: date_to
  *         schema:
  *           type: string
  *           format: date
- *         description: Ngày kết thúc (YYYY-MM-DD). Nếu không có, mặc định là hôm nay
+ *         description: Ngày kết thúc (YYYY-MM-DD). Nếu không có thì lấy tất cả
  *       - in: query
  *         name: center_id
  *         schema:
@@ -125,7 +137,7 @@ router.get(
  *         description: Lọc theo trạng thái checklist. Nếu không truyền thì lấy tất cả
  *     responses:
  *       200:
- *         description: Top 5 phụ tùng thay nhiều nhất
+ *         description: Danh sách phụ tùng thay nhiều nhất (sắp xếp từ cao xuống thấp)
  */
 router.get(
   "/top-parts",
@@ -137,7 +149,10 @@ router.get(
  * @swagger
  * /api/dashboard/top-technicians-appointments:
  *   get:
- *     summary: Top 5 nhân viên có nhiều appointment nhất (mặc định 30 ngày, có thể filter theo thời gian)
+ *     summary: Danh sách nhân viên có nhiều appointment nhất (sắp xếp từ cao xuống thấp)
+ *     description: |
+ *       - Không truyền gì: Lấy tất cả danh sách nhân viên sắp xếp từ cao xuống thấp
+ *       - Có filter: Lọc và sắp xếp từ cao xuống thấp
  *     tags: [Dashboard]
  *     security:
  *       - bearerAuth: []
@@ -147,13 +162,13 @@ router.get(
  *         schema:
  *           type: string
  *           format: date
- *         description: Ngày bắt đầu (YYYY-MM-DD). Nếu không có, mặc định là 30 ngày trước
+ *         description: Ngày bắt đầu (YYYY-MM-DD). Nếu không có thì lấy tất cả
  *       - in: query
  *         name: date_to
  *         schema:
  *           type: string
  *           format: date
- *         description: Ngày kết thúc (YYYY-MM-DD). Nếu không có, mặc định là hôm nay
+ *         description: Ngày kết thúc (YYYY-MM-DD). Nếu không có thì lấy tất cả
  *       - in: query
  *         name: center_id
  *         schema:
@@ -163,11 +178,11 @@ router.get(
  *         name: status
  *         schema:
  *           type: string
- *           enum: [pending, assigned, check_in, in_progress, repaired, completed, canceled]
+ *           enum: [pending, assigned, check_in, in_progress, completed, canceled]
  *         description: Lọc theo trạng thái appointment. Nếu không truyền thì lấy tất cả
  *     responses:
  *       200:
- *         description: Top 5 nhân viên có nhiều appointment nhất
+ *         description: Danh sách nhân viên có nhiều appointment nhất (sắp xếp từ cao xuống thấp)
  */
 router.get(
   "/top-technicians-appointments",
@@ -179,7 +194,10 @@ router.get(
  * @swagger
  * /api/dashboard/top-technicians-revenue:
  *   get:
- *     summary: Top 5 nhân viên kiếm nhiều tiền nhất (mặc định 30 ngày, có thể filter theo thời gian)
+ *     summary: Danh sách nhân viên kiếm nhiều tiền nhất (sắp xếp từ cao xuống thấp)
+ *     description: |
+ *       - Không truyền gì: Lấy tất cả danh sách nhân viên sắp xếp từ cao xuống thấp
+ *       - Có filter: Lọc và sắp xếp từ cao xuống thấp
  *     tags: [Dashboard]
  *     security:
  *       - bearerAuth: []
@@ -189,13 +207,13 @@ router.get(
  *         schema:
  *           type: string
  *           format: date
- *         description: Ngày bắt đầu (YYYY-MM-DD). Nếu không có, mặc định là 30 ngày trước
+ *         description: Ngày bắt đầu (YYYY-MM-DD). Nếu không có thì lấy tất cả
  *       - in: query
  *         name: date_to
  *         schema:
  *           type: string
  *           format: date
- *         description: Ngày kết thúc (YYYY-MM-DD). Nếu không có, mặc định là hôm nay
+ *         description: Ngày kết thúc (YYYY-MM-DD). Nếu không có thì lấy tất cả
  *       - in: query
  *         name: center_id
  *         schema:
@@ -205,11 +223,11 @@ router.get(
  *         name: status
  *         schema:
  *           type: string
- *           enum: [pending, assigned, check_in, in_progress, repaired, completed, canceled]
+ *           enum: [pending, assigned, check_in, in_progress, completed, canceled]
  *         description: Lọc theo trạng thái appointment. Nếu không truyền thì lấy tất cả
  *     responses:
  *       200:
- *         description: Danh sách nhân viên kiếm nhiều tiền nhất
+ *         description: Danh sách nhân viên kiếm nhiều tiền nhất (sắp xếp từ cao xuống thấp)
  */
 router.get(
   "/top-technicians-revenue",

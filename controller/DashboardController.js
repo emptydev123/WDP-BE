@@ -160,7 +160,6 @@ exports.getDashboardOverview = async (req, res) => {
       assigned: 0,
       check_in: 0,
       in_progress: 0,
-      repaired: 0,
       completed: 0,
       delay: 0,
       canceled: 0,
@@ -207,12 +206,6 @@ exports.getDashboardOverview = async (req, res) => {
               (appointmentBreakdown.in_progress / totalAppointments) *
               100
             ).toFixed(2)
-          : 0,
-      repaired:
-        totalAppointments > 0
-          ? ((appointmentBreakdown.repaired / totalAppointments) * 100).toFixed(
-              2
-            )
           : 0,
       completed:
         totalAppointments > 0
@@ -264,7 +257,6 @@ exports.getDashboardOverview = async (req, res) => {
               assigned: parseFloat(appointmentRates.assigned),
               check_in: parseFloat(appointmentRates.check_in),
               in_progress: parseFloat(appointmentRates.in_progress),
-              repaired: parseFloat(appointmentRates.repaired),
               completed: parseFloat(appointmentRates.completed),
               delay: parseFloat(appointmentRates.delay),
               canceled: parseFloat(appointmentRates.canceled),
@@ -287,11 +279,11 @@ exports.getDashboardOverview = async (req, res) => {
   }
 };
 
-// Hãng xe nào sửa nhiều nhất (có thể filter theo thời gian và center_id)
+// Hãng xe nào sửa nhiều nhất (có thể filter theo thời gian, center_id, vehicle_id)
 exports.getTopBrandsByRepairs = async (req, res) => {
   try {
     const userId = req._id?.toString();
-    const { date_from, date_to, center_id, status } = req.query;
+    const { date_from, date_to, center_id, status, vehicle_id } = req.query;
 
     if (!userId) {
       return res.status(401).json({
@@ -300,28 +292,23 @@ exports.getTopBrandsByRepairs = async (req, res) => {
       });
     }
 
-    // Xác định khoảng thời gian
-    let startDate, endDate;
+    // Tạo match filter
+    const matchFilter = {};
 
-    if (date_from && date_to) {
-      // Nếu có filter từ query params
-      startDate = new Date(date_from);
-      startDate.setHours(0, 0, 0, 0);
-      endDate = new Date(date_to);
-      endDate.setHours(23, 59, 59, 999);
-    } else {
-      // Mặc định: 3 tuần trước đến hiện tại
-      startDate = new Date();
-      startDate.setDate(startDate.getDate() - 21);
-      startDate.setHours(0, 0, 0, 0);
-      endDate = new Date();
-      endDate.setHours(23, 59, 59, 999);
+    // Xác định khoảng thời gian nếu có filter
+    if (date_from || date_to) {
+      matchFilter.appoinment_date = {};
+      if (date_from) {
+        const startDate = new Date(date_from);
+        startDate.setHours(0, 0, 0, 0);
+        matchFilter.appoinment_date.$gte = startDate;
+      }
+      if (date_to) {
+        const endDate = new Date(date_to);
+        endDate.setHours(23, 59, 59, 999);
+        matchFilter.appoinment_date.$lte = endDate;
+      }
     }
-
-    // Lấy appointments trong khoảng thời gian
-    const matchFilter = {
-      appoinment_date: { $gte: startDate, $lte: endDate },
-    };
 
     // Thêm filter status nếu có, nếu không thì lấy tất cả
     if (status) {
@@ -336,7 +323,15 @@ exports.getTopBrandsByRepairs = async (req, res) => {
           : center_id;
     }
 
-    const appointments = await Appointment.aggregate([
+    // Thêm filter vehicle_id nếu có (để lọc xe nào đến sửa nhiều nhất)
+    if (vehicle_id) {
+      matchFilter.vehicle_id =
+        typeof vehicle_id === "string"
+          ? new mongoose.Types.ObjectId(vehicle_id)
+          : vehicle_id;
+    }
+
+    const pipeline = [
       {
         $match: matchFilter,
       },
@@ -358,31 +353,63 @@ exports.getTopBrandsByRepairs = async (req, res) => {
         },
       },
       { $unwind: "$vehicleModel" },
-      {
+    ];
+
+    // Nếu có vehicle_id filter, group theo vehicle thay vì brand
+    if (vehicle_id) {
+      pipeline.push({
+        $group: {
+          _id: "$vehicle_id",
+          vehicle_info: {
+            $first: {
+              license_plate: "$vehicle.license_plate",
+              brand: "$vehicleModel.brand",
+              model: "$vehicleModel.model_name",
+            },
+          },
+          count: { $sum: 1 },
+        },
+      });
+    } else {
+      pipeline.push({
         $group: {
           _id: "$vehicleModel.brand",
           count: { $sum: 1 },
         },
-      },
-      { $sort: { count: -1 } },
-      { $limit: 5 },
-    ]);
+      });
+    }
 
-    const result = appointments.map((item) => ({
-      brand: item._id || "Unknown",
-      repairCount: item.count,
-    }));
+    // Sắp xếp theo count giảm dần (top cao nhất đi xuống)
+    pipeline.push({ $sort: { count: -1 } });
+
+    // Không giới hạn số lượng - lấy tất cả
+    const appointments = await Appointment.aggregate(pipeline);
+
+    let result;
+    if (vehicle_id) {
+      result = appointments.map((item) => ({
+        vehicle_id: item._id,
+        license_plate: item.vehicle_info?.license_plate || "Unknown",
+        brand: item.vehicle_info?.brand || "Unknown",
+        model: item.vehicle_info?.model || "Unknown",
+        repairCount: item.count,
+      }));
+    } else {
+      result = appointments.map((item) => ({
+        brand: item._id || "Unknown",
+        repairCount: item.count,
+      }));
+    }
 
     return res.status(200).json({
-      message: "Lấy danh sách hãng xe sửa nhiều nhất thành công",
+      message: vehicle_id
+        ? "Lấy danh sách xe sửa nhiều nhất thành công"
+        : "Lấy danh sách hãng xe sửa nhiều nhất thành công",
       success: true,
       data: {
-        period:
-          date_from && date_to
-            ? "Theo khoảng thời gian"
-            : "3 tuần qua (mặc định)",
-        from: startDate,
-        to: endDate,
+        period: date_from || date_to ? "Theo khoảng thời gian" : "Tất cả",
+        from: date_from || null,
+        to: date_to || null,
         brands: result,
       },
     });
@@ -409,35 +436,30 @@ exports.getTopPartsReplaced = async (req, res) => {
       });
     }
 
-    // Xác định khoảng thời gian
-    let startDate, endDate;
-
-    if (date_from && date_to) {
-      // Nếu có filter từ query params
-      startDate = new Date(date_from);
-      startDate.setHours(0, 0, 0, 0);
-      endDate = new Date(date_to);
-      endDate.setHours(23, 59, 59, 999);
-    } else {
-      // Mặc định: đầu tháng hiện tại đến hiện tại
-      startDate = new Date();
-      startDate.setDate(1);
-      startDate.setHours(0, 0, 0, 0);
-      endDate = new Date();
-      endDate.setHours(23, 59, 59, 999);
-    }
-
     // Tạo filter cho checklist
-    const checklistFilter = {
-      createdAt: { $gte: startDate, $lte: endDate },
-    };
+    const checklistFilter = {};
+
+    // Xác định khoảng thời gian nếu có filter
+    if (date_from || date_to) {
+      checklistFilter.createdAt = {};
+      if (date_from) {
+        const startDate = new Date(date_from);
+        startDate.setHours(0, 0, 0, 0);
+        checklistFilter.createdAt.$gte = startDate;
+      }
+      if (date_to) {
+        const endDate = new Date(date_to);
+        endDate.setHours(23, 59, 59, 999);
+        checklistFilter.createdAt.$lte = endDate;
+      }
+    }
 
     // Thêm filter status nếu có, nếu không thì lấy tất cả
     if (status) {
       checklistFilter.status = status;
     }
 
-    // Lấy checklists trong khoảng thời gian và đã được accepted hoặc completed
+    // Lấy checklists (không giới hạn thời gian nếu không có filter)
     let checklists = await Checklist.find(checklistFilter)
       .populate("parts.part_id")
       .populate({
@@ -475,21 +497,18 @@ exports.getTopPartsReplaced = async (req, res) => {
       });
     });
 
-    // Sắp xếp và lấy top 5
-    const result = Object.values(partCounts)
-      .sort((a, b) => b.totalQuantity - a.totalQuantity)
-      .slice(0, 5);
+    // Sắp xếp theo totalQuantity giảm dần (top cao nhất đi xuống) - không giới hạn
+    const result = Object.values(partCounts).sort(
+      (a, b) => b.totalQuantity - a.totalQuantity
+    );
 
     return res.status(200).json({
       message: "Lấy danh sách phụ tùng thay nhiều nhất thành công",
       success: true,
       data: {
-        period:
-          date_from && date_to
-            ? "Theo khoảng thời gian"
-            : "Tháng này (mặc định)",
-        from: startDate,
-        to: endDate,
+        period: date_from || date_to ? "Theo khoảng thời gian" : "Tất cả",
+        from: date_from || null,
+        to: date_to || null,
         parts: result,
       },
     });
@@ -516,29 +535,25 @@ exports.getTopTechniciansByAppointments = async (req, res) => {
       });
     }
 
-    // Xác định khoảng thời gian
-    let startDate, endDate;
-
-    if (date_from && date_to) {
-      // Nếu có filter từ query params
-      startDate = new Date(date_from);
-      startDate.setHours(0, 0, 0, 0);
-      endDate = new Date(date_to);
-      endDate.setHours(23, 59, 59, 999);
-    } else {
-      // Mặc định: 30 ngày trước đến hiện tại
-      startDate = new Date();
-      startDate.setDate(startDate.getDate() - 30);
-      startDate.setHours(0, 0, 0, 0);
-      endDate = new Date();
-      endDate.setHours(23, 59, 59, 999);
-    }
-
     // Tạo match filter
     const matchFilter = {
       technician_id: { $ne: null },
-      appoinment_date: { $gte: startDate, $lte: endDate },
     };
+
+    // Xác định khoảng thời gian nếu có filter
+    if (date_from || date_to) {
+      matchFilter.appoinment_date = {};
+      if (date_from) {
+        const startDate = new Date(date_from);
+        startDate.setHours(0, 0, 0, 0);
+        matchFilter.appoinment_date.$gte = startDate;
+      }
+      if (date_to) {
+        const endDate = new Date(date_to);
+        endDate.setHours(23, 59, 59, 999);
+        matchFilter.appoinment_date.$lte = endDate;
+      }
+    }
 
     // Thêm filter status nếu có, nếu không thì lấy tất cả
     if (status) {
@@ -581,20 +596,16 @@ exports.getTopTechniciansByAppointments = async (req, res) => {
           appointmentCount: 1,
         },
       },
-      { $sort: { appointmentCount: -1 } },
-      { $limit: 5 },
+      { $sort: { appointmentCount: -1 } }, // Sắp xếp top cao nhất đi xuống, không giới hạn
     ]);
 
     return res.status(200).json({
       message: "Lấy danh sách nhân viên có nhiều appointment nhất thành công",
       success: true,
       data: {
-        period:
-          date_from && date_to
-            ? "Theo khoảng thời gian"
-            : "30 ngày qua (mặc định)",
-        from: startDate,
-        to: endDate,
+        period: date_from || date_to ? "Theo khoảng thời gian" : "Tất cả",
+        from: date_from || null,
+        to: date_to || null,
         technicians: technicians.map((t) => ({
           technician_id: t.technician_id,
           technician_name: t.technician_name,
@@ -627,30 +638,26 @@ exports.getTopTechniciansByRevenue = async (req, res) => {
       });
     }
 
-    // Xác định khoảng thời gian
-    let startDate, endDate;
-
-    if (date_from && date_to) {
-      // Nếu có filter từ query params
-      startDate = new Date(date_from);
-      startDate.setHours(0, 0, 0, 0);
-      endDate = new Date(date_to);
-      endDate.setHours(23, 59, 59, 999);
-    } else {
-      // Mặc định: 30 ngày trước đến hiện tại
-      startDate = new Date();
-      startDate.setDate(startDate.getDate() - 30);
-      startDate.setHours(0, 0, 0, 0);
-      endDate = new Date();
-      endDate.setHours(23, 59, 59, 999);
-    }
-
     // Tạo match filter
     const matchFilter = {
       technician_id: { $ne: null },
-      appoinment_date: { $gte: startDate, $lte: endDate },
       $or: [{ payment_id: { $ne: null } }, { final_payment_id: { $ne: null } }],
     };
+
+    // Xác định khoảng thời gian nếu có filter
+    if (date_from || date_to) {
+      matchFilter.appoinment_date = {};
+      if (date_from) {
+        const startDate = new Date(date_from);
+        startDate.setHours(0, 0, 0, 0);
+        matchFilter.appoinment_date.$gte = startDate;
+      }
+      if (date_to) {
+        const endDate = new Date(date_to);
+        endDate.setHours(23, 59, 59, 999);
+        matchFilter.appoinment_date.$lte = endDate;
+      }
+    }
 
     // Thêm filter status nếu có, nếu không thì lấy tất cả
     if (status) {
@@ -665,7 +672,7 @@ exports.getTopTechniciansByRevenue = async (req, res) => {
           : center_id;
     }
 
-    // Lấy appointments có technician và payment đã thanh toán trong khoảng thời gian
+    // Lấy appointments có technician và payment đã thanh toán
     const technicianRevenue = await Appointment.aggregate([
       {
         $match: matchFilter,
@@ -735,20 +742,16 @@ exports.getTopTechniciansByRevenue = async (req, res) => {
           totalRevenue: 1,
         },
       },
-      { $sort: { totalRevenue: -1 } },
-      { $limit: 5 },
+      { $sort: { totalRevenue: -1 } }, // Sắp xếp top cao nhất đi xuống, không giới hạn
     ]);
 
     return res.status(200).json({
       message: "Lấy danh sách nhân viên kiếm nhiều tiền nhất thành công",
       success: true,
       data: {
-        period:
-          date_from && date_to
-            ? "Theo khoảng thời gian"
-            : "30 ngày qua (mặc định)",
-        from: startDate,
-        to: endDate,
+        period: date_from || date_to ? "Theo khoảng thời gian" : "Tất cả",
+        from: date_from || null,
+        to: date_to || null,
         technicians: technicianRevenue.map((t) => ({
           technician_id: t.technician_id,
           technician_name: t.technician_name,

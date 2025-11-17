@@ -19,7 +19,6 @@ const appointmentSchema = new schema(
         "assigned",
         "check_in",
         "in_progress",
-        "repaired",
         "completed",
         "canceled",
       ],
@@ -104,6 +103,11 @@ const appointmentSchema = new schema(
       type: Date,
       required: false,
       default: null,
+    },
+    initial_vehicle_condition: {
+      type: String,
+      required: false,
+      description: "Tình trạng ban đầu của xe khi checkin (trước khi khám xe)",
     },
   },
   { timestamps: true }

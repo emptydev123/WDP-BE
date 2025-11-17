@@ -35,7 +35,7 @@ const auth = require("../middlewares/auth");
  *         name: status
  *         schema:
  *           type: string
- *           enum: [pending, assigned, check_in, in_progress, repaired, completed, canceled]
+ *           enum: [pending, assigned, check_in, in_progress, completed, canceled]
  *         description: Lọc theo trạng thái
  *       - in: query
  *         name: service_center_id
@@ -433,7 +433,7 @@ router.get(
  *                 description: ID của appointment
  *               status:
  *                 type: string
- *                 enum: [pending, assigned, check_in, in_progress, repaired, completed, canceled]
+ *                 enum: [pending, assigned, check_in, in_progress, completed, canceled]
  *                 example: "in_progress"
  *                 description: Trạng thái mới
  *     responses:
@@ -480,7 +480,7 @@ router.put(
  *         name: status
  *         schema:
  *           type: string
- *           enum: [pending, assigned, check_in, in_progress, repaired, completed, canceled]
+ *           enum: [pending, assigned, check_in, in_progress, completed, canceled]
  *         description: Lọc theo trạng thái
  *     responses:
  *       200:
@@ -544,7 +544,12 @@ router.get(
  * @swagger
  * /api/appointment/{appointmentId}/final-payment:
  *   put:
- *     summary: Cập nhật appointment với final payment (số tiền còn lại)
+ *     summary: Tạo final payment cho appointment đã được báo giá
+ *     description: |
+ *       Tạo final payment cho appointment đã được check-in và đã báo giá (checklist đã được accept).
+ *       Khi thanh toán thành công, hệ thống sẽ tự động:
+ *       1. Cập nhật inventory (trừ số lượng parts)
+ *       2. Chuyển appointment status thành "in_progress"
  *     tags: [Appointments]
  *     security:
  *       - bearerAuth: []
@@ -554,10 +559,10 @@ router.get(
  *         required: true
  *         schema:
  *           type: string
- *         description: ID của appointment
+ *         description: ID của appointment (phải có status "check_in" và đã có final_cost)
  *     responses:
  *       200:
- *         description: Cập nhật appointment với final payment thành công
+ *         description: Tạo final payment thành công
  *         content:
  *           application/json:
  *             schema:
@@ -570,7 +575,7 @@ router.get(
  *                 data:
  *                   type: object
  *       400:
- *         description: Appointment chưa hoàn thành hoặc đã có final payment
+ *         description: Appointment chưa được check-in, chưa báo giá hoặc đã có final payment
  *       401:
  *         description: Unauthorized
  *       404:
