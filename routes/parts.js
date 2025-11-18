@@ -145,6 +145,10 @@ router.get("/:partId", auth.authMiddleWare, getPartById);
  *               sellPrice:
  *                 type: number
  *                 description: Giá bán
+ *               typePart:
+ *                 type: string
+ *                 enum: [power, electrical, brake, wheel, saftety]
+ *                 description: Loại phụ tùng
  *     responses:
  *       201:
  *         description: Part created successfully
@@ -200,6 +204,10 @@ router.post("/", auth.authMiddleWare, createPart);
  *               sellPrice:
  *                 type: number
  *                 description: Giá bán
+ *               typePart:
+ *                 type: string
+ *                 enum: [power, electrical, brake, wheel, saftety]
+ *                 description: Loại phụ tùng
  *     responses:
  *       200:
  *         description: Part updated successfully

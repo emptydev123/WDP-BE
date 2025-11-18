@@ -123,6 +123,7 @@ exports.createPart = async (req, res) => {
       warranty_month,
       costPrice,
       sellPrice,
+      typePart,
     } = req.body;
     const userId = req._id?.toString();
 
@@ -158,6 +159,7 @@ exports.createPart = async (req, res) => {
       warranty_month,
       costPrice,
       sellPrice,
+      typePart,
     });
 
     await part.save();
@@ -189,6 +191,7 @@ exports.updatePart = async (req, res) => {
       warranty_month,
       costPrice,
       sellPrice,
+      typePart
     } = req.body;
     const userId = req._id?.toString();
 
@@ -231,7 +234,7 @@ exports.updatePart = async (req, res) => {
     if (warranty_month !== undefined) part.warranty_month = warranty_month;
     if (costPrice !== undefined) part.costPrice = costPrice;
     if (sellPrice !== undefined) part.sellPrice = sellPrice;
-
+    if (typePart !== undefined) part.typePart = typePart;
     await part.save();
 
     return res.status(200).json({

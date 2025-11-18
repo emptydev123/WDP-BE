@@ -13,6 +13,7 @@ const issueTypeRouter = require("../routes/issueType");
 const notificationRouter = require("../routes/notification");
 const checklistRouter = require("../routes/checklist");
 const dashboardRouter = require("../routes/dashboard");
+const transferRouter = require("../routes/transfer");
 const PaymentController = require("../controller/PaymentController");
 
 const chatRouter = require("../routes/chat");
@@ -33,6 +34,7 @@ router.use("/issue-types", issueTypeRouter);
 router.use("/notifications", notificationRouter);
 router.use("/checklist", checklistRouter);
 router.use("/dashboard", dashboardRouter);
+router.use("/transfer", transferRouter);
 
 router.use("/chat", chatRouter);
 

@@ -25,6 +25,11 @@ const partSchema = new schema(
       type: Number,
       required: false,
     },
+    type: {
+      type: String,
+      enum: ["power", "electrical", "brake", "wheel", "saftety"],
+      required: false
+    },
   },
   { timestamps: true }
 );

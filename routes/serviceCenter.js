@@ -29,9 +29,12 @@ const auth = require("../middlewares/auth");
  *               - center_name
  *               - address
  *               - phone
- *               - user_id
  *               - email
  *             properties:
+ *               user_id:
+ *                 type: string
+ *                 description: ID của user (optional, nếu không có sẽ tự động lấy từ token)
+ *                 example: "60d5f84e5b7c6d001f8184d2"
  *               center_name:
  *                 type: string
  *                 example: "EV Hà Nội"

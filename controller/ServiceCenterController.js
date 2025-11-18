@@ -10,6 +10,7 @@ const { updateSlotsForServiceCenter, getDayOfWeek, checkAndUpdateSlotsForNextWee
 exports.createServiceCenter = async (req, res) => {
     try {
         const { center_name, address, phone, user_id, email } = req.body;
+        const userIdFromToken = req._id?.toString();
 
         // Kiểm tra nếu trung tâm dịch vụ đã tồn tại
         const existingCenter = await ServiceCenter.findOne({ center_name });
@@ -17,11 +18,20 @@ exports.createServiceCenter = async (req, res) => {
             return res.status(400).json({ message: "Service center already exists." });
         }
 
+        // Xác định user_id: ưu tiên từ body, nếu không có thì lấy từ token
+        const finalUserId = user_id || userIdFromToken;
+
+        if (!finalUserId) {
+            return res.status(400).json({
+                message: "Thiếu user_id. Vui lòng đăng nhập hoặc cung cấp user_id trong request body."
+            });
+        }
+
         // Tạo trung tâm dịch vụ mới
         const serviceCenter = new ServiceCenter({
             center_name,
             address,
-            user_id,
+            user_id: finalUserId,
             phone,
             email,
         });

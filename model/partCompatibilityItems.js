@@ -9,7 +9,7 @@ const partCompatibilityItemsSchema = new schema({
     model_id: {
         type: mongoose.Types.ObjectId,
         ref: "VehicleModel",
-        required: true
+        required: false
     },
 
 }, { timestamps: true })
