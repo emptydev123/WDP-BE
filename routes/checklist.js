@@ -257,7 +257,7 @@ router.post("/", authMiddleWare, ChecklistController.createChecklist);
  *               properties:
  *                 message:
  *                   type: string
- *                   example: "Checklist đã được chấp nhận, đã báo giá" hoặc "Checklist đã được chấp nhận, đã chuyển sang in_progress (không có phụ tùng)"
+ *                   example: "Checklist đã được chấp nhận, đã báo giá hoặc Checklist đã được chấp nhận, đã chuyển sang in_progress (không có phụ tùng)"
  *                 success:
  *                   type: boolean
  *                 data:
@@ -276,8 +276,8 @@ router.post("/", authMiddleWare, ChecklistController.createChecklist);
  *                           type: string
  *                         status:
  *                           type: string
- *                           example: "in_progress" hoặc "check_in"
- *                           description: "in_progress" nếu không có parts, "check_in" nếu có parts (chờ thanh toán)
+ *                           example: "in_progress"
+ *                           description: "in_progress nếu không có parts, check_in nếu có parts (chờ thanh toán)"
  *                         final_cost:
  *                           type: number
  *       400:
