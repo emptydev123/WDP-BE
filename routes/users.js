@@ -14,7 +14,7 @@ const auth = require("../middlewares/auth");
  * @swagger
  * /api/users/register:
  *   post:
- *     summary: Đăng ký tài khoản mới
+ *     summary: Register new account
  *     tags: [Users]
  *     requestBody:
  *       required: true
@@ -44,9 +44,9 @@ const auth = require("../middlewares/auth");
  *                 example: Huỳnh Trấn Tâm
  *     responses:
  *       200:
- *         description: Đăng ký thành công
+ *         description: Registration successful
  *       400:
- *         description: Lỗi validate
+ *         description: Validation error
  */
 router.post("/register", user.registerUser);
 
@@ -54,7 +54,7 @@ router.post("/register", user.registerUser);
  * @swagger
  * /api/users/login:
  *   post:
- *     summary: Đăng nhập để lấy JWT token
+ *     summary: Login to get JWT token
  *     tags: [Users]
  *     requestBody:
  *       required: true
@@ -74,9 +74,9 @@ router.post("/register", user.registerUser);
  *                 example: 123456
  *     responses:
  *       200:
- *         description: Đăng nhập thành công, trả về accessToken
+ *         description: Login successful, returns accessToken
  *       401:
- *         description: Sai username hoặc password
+ *         description: Incorrect username or password
  */
 router.post("/login", user.login);
 
@@ -84,13 +84,13 @@ router.post("/login", user.login);
  * @swagger
  * /api/users/getprofile:
  *   get:
- *     summary: Lấy profile của user hiện tại
+ *     summary: Get current user profile
  *     tags: [Users]
  *     security:
  *       - bearerAuth: []
  *     responses:
  *       200:
- *         description: Lấy profile thành công
+ *         description: Successfully retrieved profile
  *         content:
  *           application/json:
  *             schema:
@@ -100,7 +100,7 @@ router.post("/login", user.login);
  *       401:
  *         description: Unauthorized / Token invalid
  *       404:
- *         description: Profile không tìm thấy
+ *         description: Profile not found
  */
 router.get(
   "/getprofile",
@@ -113,7 +113,7 @@ router.get(
  * @swagger
  * /api/users/getallprofile:
  *   get:
- *     summary: Lấy tất cả user (có thể filter theo role)
+ *     summary: Get all users (can filter by role)
  *     tags: [Users]
  *     parameters:
  *       - in: query
@@ -121,27 +121,27 @@ router.get(
  *         schema:
  *           type: string
  *           enum: [ staff, technician]
- *         description: Lọc theo role (mặc định là customer nếu không có tham số)
+ *         description: Filter by role (default is customer if no parameter)
  *       - in: query
  *         name: id
  *         schema:
  *           type: string
- *         description: Lọc theo ID cụ thể của user (optional)
+ *         description: Filter by specific user ID (optional)
  *       - in: query
  *         name: page
  *         schema:
  *           type: integer
  *           default: 1
- *         description: Số trang
+ *         description: Page number
  *       - in: query
  *         name: limit
  *         schema:
  *           type: integer
  *           default: 10
- *         description: Số item per page
+ *         description: Items per page
  *     responses:
  *       200:
- *         description: Lấy danh sách users thành công
+ *         description: Successfully retrieved list of users
  *         content:
  *           application/json:
  *             schema:
@@ -186,7 +186,7 @@ router.get(
  *                         items_per_page:
  *                           type: integer
  *       500:
- *         description: Lỗi server
+ *         description: Server error
  */
 router.get("/getallprofile", user.getAllProfileUsers);
 
@@ -194,7 +194,7 @@ router.get("/getallprofile", user.getAllProfileUsers);
  * @swagger
  * /api/users/loginGoogle:
  *   post:
- *     summary: Đăng nhập bằng Google
+ *     summary: Login with Google
  *     tags: [Users]
  *     requestBody:
  *       required: true
@@ -210,9 +210,9 @@ router.get("/getallprofile", user.getAllProfileUsers);
  *                 example: "eyJhbGciOiJSUzI1NiIsImtpZCI6..."
  *     responses:
  *       201:
- *         description: Đăng nhập thành công
+ *         description: Login successful
  *       401:
- *         description: Token Google không hợp lệ
+ *         description: Invalid Google token
  */
 router.post("/loginfirebase", user.loginGoogle);
 
@@ -220,7 +220,7 @@ router.post("/loginfirebase", user.loginGoogle);
  * @swagger
  * /api/users/forgotPassword:
  *   post:
- *     summary: Yêu cầu reset mật khẩu (gửi email có link reset)
+ *     summary: Request password reset (send email with reset link)
  *     tags: [Users]
  *     requestBody:
  *       required: true
@@ -236,9 +236,9 @@ router.post("/loginfirebase", user.loginGoogle);
  *                 example: "customer@gmail.com"
  *     responses:
  *       200:
- *         description: Email reset password đã được gửi
+ *         description: Password reset email sent
  *       400:
- *         description: Email không tồn tại
+ *         description: Email does not exist
  */
 router.post("/forgotPassword", user.forgotPassword);
 
@@ -246,7 +246,7 @@ router.post("/forgotPassword", user.forgotPassword);
  * @swagger
  * /api/users/resetpassword:
  *   post:
- *     summary: Đặt lại mật khẩu mới
+ *     summary: Reset password
  *     tags: [Users]
  *     parameters:
  *       - in: query
@@ -269,9 +269,9 @@ router.post("/forgotPassword", user.forgotPassword);
  *                 example: "newPassword123"
  *     responses:
  *       200:
- *         description: Đặt lại mật khẩu thành công
+ *         description: Password reset successful
  *       400:
- *         description: Token không hợp lệ hoặc hết hạn
+ *         description: Invalid or expired token
  */
 router.post("/resetpassword", user.resetPassword);
 
@@ -295,9 +295,9 @@ router.post("/resetpassword", user.resetPassword);
  *                 format: binary
  *     responses:
  *       200:
- *         description: Upload avatar thành công
+ *         description: Avatar uploaded successfully
  *       400:
- *         description: Không có file được upload
+ *         description: No file uploaded
  *       401:
  *         description: Unauthorized
  */
@@ -312,7 +312,7 @@ router.post(
  * @swagger
  * /api/users/update-profile:
  *   put:
- *     summary: Cập nhật thông tin profile
+ *     summary: Update profile information
  *     tags: [Users]
  *     security:
  *       - bearerAuth: []
@@ -331,11 +331,11 @@ router.post(
  *                 example: "0901234567"
  *     responses:
  *       200:
- *         description: Cập nhật profile thành công
+ *         description: Profile updated successfully
  *       401:
  *         description: Unauthorized
  *       404:
- *         description: User không tồn tại
+ *         description: User not found
  */
 router.put(
   "/update-profile",

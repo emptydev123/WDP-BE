@@ -8,14 +8,14 @@ const auth = require("../middlewares/auth");
  * @swagger
  * tags:
  *   name: Service Center
- *   description: API quản lý trung tâm dịch vụ và lịch làm việc
+ *   description: API for managing service centers and work schedules
  */
 
 /**
  * @swagger
  * /api/service-center/create:
  *   post:
- *     summary: Tạo trung tâm dịch vụ mới
+ *     summary: Create new service center
  *     tags: [Service Center]
  *     security:
  *       - bearerAuth: []
@@ -49,13 +49,13 @@ const auth = require("../middlewares/auth");
  *                 example: true
  *     responses:
  *       201:
- *         description: Tạo Service Center thành công
+ *         description: Service Center created successfully
  *       400:
- *         description: Dữ liệu không hợp lệ
+ *         description: Invalid data
  *       401:
- *         description: Không có quyền truy cập
+ *         description: Unauthorized access
  *       500:
- *         description: Lỗi server
+ *         description: Server error
  */
 router.post(
   "/create",
@@ -64,15 +64,11 @@ router.post(
   serviceCenter.createServiceCenter
 );
 
-
-
-
-
 /**
  * @swagger
  * /api/service-center/technicians:
  *   get:
- *     summary: Lấy danh sách technicians (có thể filter theo center_id)
+ *     summary: Get list of technicians (can filter by center_id)
  *     tags: [Service Center]
  *     security:
  *       - bearerAuth: []
@@ -82,16 +78,16 @@ router.post(
  *         required: false
  *         schema:
  *           type: string
- *         description: ID của Service Center để lọc technicians
+ *         description: Service Center ID to filter technicians
  *     responses:
  *       200:
- *         description: Lấy danh sách technician thành công
+ *         description: Successfully retrieved list of technicians
  *       401:
- *         description: Không có quyền truy cập
+ *         description: Unauthorized access
  *       404:
- *         description: Không tìm thấy trung tâm (khi truyền center_id không hợp lệ)
+ *         description: Service center not found (when invalid center_id is provided)
  *       500:
- *         description: Lỗi server
+ *         description: Server error
  */
 router.get(
   "/technicians",
@@ -104,7 +100,7 @@ router.get(
  * @swagger
  * /api/service-center/get:
  *   get:
- *     summary: Lấy danh sách tất cả trung tâm và giờ làm việc theo từng tuần, khoảng ngày hoặc ngày cụ thể
+ *     summary: Get list of all service centers and working hours by week, date range or specific date
  *     tags: [Service Center]
  *     security:
  *       - bearerAuth: []
@@ -114,33 +110,33 @@ router.get(
  *         schema:
  *           type: string
  *           format: date
- *         description: Ngày cụ thể (YYYY-MM-DD). Ưu tiên cao nhất - chỉ trả về dữ liệu của ngày này. Nếu có date, sẽ bỏ qua start_date/end_date và weeks
+ *         description: Specific date (YYYY-MM-DD). Highest priority - only returns data for this date. If date is provided, start_date/end_date and weeks will be ignored
  *       - in: query
  *         name: weeks
  *         schema:
  *           type: integer
  *           default: 4
- *         description: Số tuần muốn lấy (mặc định 4 tuần). Chỉ dùng khi không có date và start_date/end_date
+ *         description: Number of weeks to retrieve (default 4 weeks). Only used when date and start_date/end_date are not provided
  *       - in: query
  *         name: center_id
  *         schema:
  *           type: string
- *         description: Lọc theo ID trung tâm. Khi truyền vào, response của mỗi trung tâm sẽ kèm danh sách technicians
+ *         description: Filter by service center ID. When provided, each service center response will include list of technicians
  *       - in: query
  *         name: start_date
  *         schema:
  *           type: string
  *           format: date
- *         description: Ngày bắt đầu (YYYY-MM-DD). Phải đi kèm với end_date. Chỉ dùng khi không có date. Nếu là T7/CN vẫn hiển thị nhưng chỉ có 2 ngày đó
+ *         description: Start date (YYYY-MM-DD). Must be accompanied by end_date. Only used when date is not provided. If Sat/Sun, still displays but only those 2 days
  *       - in: query
  *         name: end_date
  *         schema:
  *           type: string
  *           format: date
- *         description: Ngày kết thúc (YYYY-MM-DD). Phải đi kèm với start_date. Chỉ dùng khi không có date. Nếu là T7/CN vẫn hiển thị nhưng chỉ có 2 ngày đó
+ *         description: End date (YYYY-MM-DD). Must be accompanied by start_date. Only used when date is not provided. If Sat/Sun, still displays but only those 2 days
  *     responses:
  *       200:
- *         description: Lấy danh sách trung tâm và giờ làm việc thành công theo từng tuần
+ *         description: Successfully retrieved list of service centers and working hours by week
  *         content:
  *           application/json:
  *             schema:
@@ -151,8 +147,8 @@ router.get(
  *                   example: true
  *                 message:
  *                   type: string
- *                   example: "Lấy danh sách trung tâm và giờ làm việc thành công (4 tuần)"
- *                   description: Message phụ thuộc vào query parameter - "ngày YYYY-MM-DD" nếu có date, "từ YYYY-MM-DD đến YYYY-MM-DD" nếu có start_date/end_date, hoặc "X tuần" nếu dùng weeks
+ *                   example: "Successfully retrieved list of service centers and working hours (4 weeks)"
+ *                   description: Message depends on query parameter - "date YYYY-MM-DD" if date provided, "from YYYY-MM-DD to YYYY-MM-DD" if start_date/end_date provided, or "X weeks" if using weeks
  *                 data:
  *                   type: array
  *                   items:
@@ -181,27 +177,27 @@ router.get(
  *                         example: 16
  *                       weeks:
  *                         type: array
- *                         description: Danh sách các tuần
+ *                         description: List of weeks
  *                         items:
  *                           type: object
  *                           properties:
  *                             week_number:
  *                               type: number
  *                               example: 1
- *                               description: Số thứ tự tuần (1, 2, 3, 4...)
+ *                               description: Week number (1, 2, 3, 4...)
  *                             week_start:
  *                               type: string
  *                               format: date
  *                               example: "2025-11-03"
- *                               description: Ngày bắt đầu tuần (Monday)
+ *                               description: Week start date (Monday)
  *                             week_end:
  *                               type: string
  *                               format: date
  *                               example: "2025-11-07"
- *                               description: Ngày kết thúc tuần (Friday)
+ *                               description: Week end date (Friday)
  *                             days:
  *                               type: array
- *                               description: Danh sách các ngày trong tuần (Monday-Friday)
+ *                               description: List of days in the week (Monday-Friday)
  *                               items:
  *                                 type: object
  *                                 properties:
@@ -224,49 +220,49 @@ router.get(
  *                                   totalSlots:
  *                                     type: number
  *                                     example: 16
- *                                     description: Tổng số slot của ngày này
+ *                                     description: Total slots for this day
  *                                   bookedSlots:
  *                                     type: number
  *                                     example: 4
- *                                     description: Số slot đã được đặt trong ngày này
+ *                                     description: Number of slots booked on this day
  *                                   remainingSlots:
  *                                     type: number
  *                                     example: 12
- *                                     description: Số slot còn lại
+ *                                     description: Remaining slots
  *                                   availableSlots:
  *                                     type: number
  *                                     example: 12
- *                                     description: Số slot khả dụng (giống remainingSlots)
+ *                                     description: Available slots (same as remainingSlots)
  *                                   timeSlots:
  *                                     type: array
- *                                     description: Danh sách các khung giờ có thể đặt (chỉ hiển thị khung giờ đã book hoặc còn trống)
+ *                                     description: List of bookable time slots (only shows booked or available slots)
  *                                     items:
  *                                       type: object
  *                                       properties:
  *                                         time:
  *                                           type: string
  *                                           example: "09:00"
- *                                           description: Khung giờ (HH:mm)
+ *                                           description: Time slot (HH:mm)
  *                                         bookedCount:
  *                                           type: number
  *                                           example: 1
- *                                           description: Số lượng booking đã có ở khung giờ này
+ *                                           description: Number of bookings at this time slot
  *                                         isFull:
  *                                           type: boolean
  *                                           example: true
- *                                           description: Khung giờ đã đầy chưa
+ *                                           description: Whether time slot is full
  *                                         available:
  *                                           type: number
  *                                           example: 0
- *                                           description: Số slot còn trống ở khung giờ này
+ *                                           description: Available slots at this time slot
  *                                         isBooked:
  *                                           type: boolean
  *                                           example: true
- *                                           description: Khung giờ này đã có booking chưa
+ *                                           description: Whether this time slot has bookings
  *       401:
  *         description: Unauthorized
  *       500:
- *         description: Lỗi server khi lấy danh sách trung tâm
+ *         description: Server error when retrieving service center list
  */
 router.get(
   "/get",
@@ -279,14 +275,14 @@ router.get(
  * @swagger
  * /api/service-center/update/{id}:
  *   put:
- *     summary: Cập nhật thông tin trung tâm dịch vụ
+ *     summary: Update service center information
  *     tags: [Service Center]
  *     security:
  *       - bearerAuth: []
  *     parameters:
  *       - name: id
  *         in: path
- *         description: ID của trung tâm cần cập nhật
+ *         description: ID of service center to update
  *         required: true
  *         schema:
  *           type: string
@@ -315,7 +311,7 @@ router.get(
  *                 example: true
  *     responses:
  *       200:
- *         description: Cập nhật trung tâm thành công
+ *         description: Service center updated successfully
  *         content:
  *           application/json:
  *             schema:
@@ -326,7 +322,7 @@ router.get(
  *                   example: true
  *                 message:
  *                   type: string
- *                   example: "Cập nhật trung tâm thành công"
+ *                   example: "Service center updated successfully"
  *                 data:
  *                   type: object
  *                   properties:
@@ -349,11 +345,11 @@ router.get(
  *                       type: boolean
  *                       example: true
  *       400:
- *         description: Không thể cập nhật do đã có lịch hẹn
+ *         description: Cannot update due to existing appointments
  *       404:
- *         description: Không tìm thấy trung tâm
+ *         description: Service center not found
  *       500:
- *         description: Lỗi server khi cập nhật trung tâm
+ *         description: Server error when updating service center
  */
 router.put(
   "/update/:id",
@@ -366,7 +362,7 @@ router.put(
  * @swagger
  * /api/service-center/delete/{id}:
  *   delete:
- *     summary: Xóa trung tâm dịch vụ
+ *     summary: Delete service center
  *     tags: [Service Center]
  *     security:
  *       - bearerAuth: []
@@ -409,7 +405,7 @@ router.delete(
  * @swagger
  * /api/service-center/technican/add:
  *   post:
- *     summary: Thêm nhân viên vào trung tâm
+ *     summary: Add employee to service center
  *     tags: [Service Center]
  *     security:
  *       - bearerAuth: []
@@ -425,35 +421,35 @@ router.delete(
  *             properties:
  *               user_id:
  *                 type: string
- *                 description: ID của người dùng (nhân viên)
+ *                 description: User ID (employee)
  *                 example: "60d5f84e5b7c6d001f8184d2"
  *               center_id:
  *                 type: string
- *                 description: ID của trung tâm
+ *                 description: Service center ID
  *                 example: "60d5f84e5b7c6d001f8184d3"
  *               maxSlotsPerDay:
  *                 type: number
- *                 description: Số slot tối đa mỗi nhân viên có thể làm trong 1 ngày (mặc định là 4)
+ *                 description: Maximum slots each employee can work per day (default is 4)
  *                 example: 4
  *               status:
  *                 type: string
  *                 enum: ["on", "off"]
- *                 description: Trạng thái làm việc của nhân viên
+ *                 description: Employee work status
  *                 example: "on"
  *     responses:
  *       201:
- *         description: Nhân viên đã được thêm vào trung tâm
+ *         description: Employee added to service center successfully
  *       400:
- *         description: Dữ liệu không hợp lệ
+ *         description: Invalid data
  *       404:
- *         description: Không tìm thấy trung tâm hoặc nhân viên
+ *         description: Service center or employee not found
  *       500:
- *         description: Lỗi server
+ *         description: Server error
  */
 router.post(
-  '/technican/add',
+  "/technican/add",
   auth.authMiddleWare,
-  auth.requireRole('admin', 'technician', 'staff', "customer"),
+  auth.requireRole("admin", "technician", "staff", "customer"),
   serviceCenter.addTechnicanToServiceCenter
 );
 
@@ -461,7 +457,7 @@ router.post(
  * @swagger
  * /api/service-center/technican/remove:
  *   post:
- *     summary: Xóa nhân viên khỏi trung tâm
+ *     summary: Remove employee from service center
  *     tags: [Service Center]
  *     security:
  *       - bearerAuth: []
@@ -477,26 +473,26 @@ router.post(
  *             properties:
  *               user_id:
  *                 type: string
- *                 description: ID của người dùng (nhân viên)
+ *                 description: User ID (employee)
  *                 example: "60d5f84e5b7c6d001f8184d2"
  *               center_id:
  *                 type: string
- *                 description: ID của trung tâm
+ *                 description: Service center ID
  *                 example: "60d5f84e5b7c6d001f8184d3"
  *     responses:
  *       200:
- *         description: Nhân viên đã được xóa khỏi trung tâm
+ *         description: Employee removed from service center successfully
  *       400:
- *         description: Dữ liệu không hợp lệ
+ *         description: Invalid data
  *       404:
- *         description: Không tìm thấy trung tâm hoặc nhân viên
+ *         description: Service center or employee not found
  *       500:
- *         description: Lỗi server
+ *         description: Server error
  */
 router.post(
-  '/technican/remove',
+  "/technican/remove",
   auth.authMiddleWare,
-  auth.requireRole('admin', 'technician', 'staff', 'customer'),
+  auth.requireRole("admin", "technician", "staff", "customer"),
   serviceCenter.removeTechnicanFromCenter
 );
 module.exports = router;

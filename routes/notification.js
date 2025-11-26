@@ -1,21 +1,21 @@
 // routes/notification.js
-const express = require('express');
+const express = require("express");
 const router = express.Router();
-const notificationController = require('../controller/NotificationController');
-const { authMiddleWare } = require('../middlewares/auth');
+const notificationController = require("../controller/NotificationController");
+const { authMiddleWare } = require("../middlewares/auth");
 
 /**
  * @swagger
  * tags:
  *   name: Notifications
- *   description: API quản lý nhắc nhở (Notifications)
+ *   description: API for managing notifications
  */
 
 /**
  * @swagger
  * /api/notifications/get:
  *   get:
- *     summary: Lấy danh sách notifications (nhắc nhở)
+ *     summary: Get list of notifications
  *     tags: [Notifications]
  *     security:
  *       - bearerAuth: []
@@ -58,15 +58,15 @@ const { authMiddleWare } = require('../middlewares/auth');
  *               properties:
  *                 message:
  *                   type: string
- *                   example: Lỗi không thể lấy data
+ *                   example: Error unable to retrieve data
  */
-router.get('/get', authMiddleWare, notificationController.getNotification);
+router.get("/get", authMiddleWare, notificationController.getNotification);
 
 /**
  * @swagger
  * /api/notifications/read-all:
  *   patch:
- *     summary: Đánh dấu tất cả thông báo đã đọc
+ *     summary: Mark all notifications as read
  *     tags: [Notifications]
  *     security:
  *       - bearerAuth: []
@@ -76,13 +76,13 @@ router.get('/get', authMiddleWare, notificationController.getNotification);
  *       500:
  *         description: Internal Server Error
  */
-router.patch('/read-all', authMiddleWare, notificationController.markAllAsRead);
+router.patch("/read-all", authMiddleWare, notificationController.markAllAsRead);
 
 /**
  * @swagger
  * /api/notifications/{notificationId}/read:
  *   patch:
- *     summary: Đánh dấu 1 thông báo đã đọc
+ *     summary: Mark one notification as read
  *     tags: [Notifications]
  *     security:
  *       - bearerAuth: []
@@ -92,17 +92,21 @@ router.patch('/read-all', authMiddleWare, notificationController.markAllAsRead);
  *         required: true
  *         schema:
  *           type: string
- *         description: ID của thông báo
+ *         description: Notification ID
  *     responses:
  *       200:
  *         description: Success
  *       404:
- *         description: Không tìm thấy thông báo
+ *         description: Notification not found
  *       403:
- *         description: Không có quyền
+ *         description: Unauthorized
  *       500:
  *         description: Internal Server Error
  */
-router.patch('/:notificationId/read', authMiddleWare, notificationController.markAsRead);
+router.patch(
+  "/:notificationId/read",
+  authMiddleWare,
+  notificationController.markAsRead
+);
 
 module.exports = router;

@@ -8,14 +8,14 @@ const { authMiddleWare } = require("../middlewares/auth");
  * @swagger
  * tags:
  *   name: Dashboard
- *   description: API dashboard thống kê
+ *   description: Dashboard statistics API
  */
 
 /**
  * @swagger
  * /api/dashboard/overview:
  *   get:
- *     summary: Dashboard tổng hợp (tất cả metrics)
+ *     summary: Dashboard overview (all metrics)
  *     tags: [Dashboard]
  *     security:
  *       - bearerAuth: []
@@ -25,21 +25,21 @@ const { authMiddleWare } = require("../middlewares/auth");
  *         schema:
  *           type: string
  *           format: date
- *         description: Ngày bắt đầu (YYYY-MM-DD)
+ *         description: Start date (YYYY-MM-DD)
  *       - in: query
  *         name: date_to
  *         schema:
  *           type: string
  *           format: date
- *         description: Ngày kết thúc (YYYY-MM-DD)
+ *         description: End date (YYYY-MM-DD)
  *       - in: query
  *         name: center_id
  *         schema:
  *           type: string
- *         description: Lọc theo Service Center ID
+ *         description: Filter by Service Center ID
  *     responses:
  *       200:
- *         description: Dashboard overview với đầy đủ metrics
+ *         description: Dashboard overview with all metrics
  *       401:
  *         description: Unauthorized
  */
@@ -53,11 +53,11 @@ router.get(
  * @swagger
  * /api/dashboard/top-brands:
  *   get:
- *     summary: Danh sách hãng xe sửa nhiều nhất (sắp xếp từ cao xuống thấp)
+ *     summary: List of most repaired vehicle brands (sorted from highest to lowest)
  *     description: |
- *       - Không truyền gì: Lấy tất cả danh sách hãng xe sắp xếp từ cao xuống thấp
- *       - Có filter: Lọc và sắp xếp từ cao xuống thấp
- *       - Nếu có vehicle_id: Lọc theo xe nào đến sửa nhiều nhất (theo vehicle_id)
+ *       - No parameters: Get all vehicle brands sorted from highest to lowest
+ *       - With filter: Filter and sort from highest to lowest
+ *       - If vehicle_id provided: Filter by which vehicle comes for repair most (by vehicle_id)
  *     tags: [Dashboard]
  *     security:
  *       - bearerAuth: []
@@ -67,32 +67,32 @@ router.get(
  *         schema:
  *           type: string
  *           format: date
- *         description: Ngày bắt đầu (YYYY-MM-DD). Nếu không có thì lấy tất cả
+ *         description: Start date (YYYY-MM-DD). If not provided, get all
  *       - in: query
  *         name: date_to
  *         schema:
  *           type: string
  *           format: date
- *         description: Ngày kết thúc (YYYY-MM-DD). Nếu không có thì lấy tất cả
+ *         description: End date (YYYY-MM-DD). If not provided, get all
  *       - in: query
  *         name: center_id
  *         schema:
  *           type: string
- *         description: Lọc theo Service Center ID
+ *         description: Filter by Service Center ID
  *       - in: query
  *         name: status
  *         schema:
  *           type: string
  *           enum: [pending, assigned, check_in, in_progress, completed, canceled]
- *         description: Lọc theo trạng thái appointment. Nếu không truyền thì lấy tất cả
+ *         description: Filter by appointment status. If not provided, get all
  *       - in: query
  *         name: vehicle_id
  *         schema:
  *           type: string
- *         description: Lọc theo vehicle_id để xem xe nào đến sửa nhiều nhất
+ *         description: Filter by vehicle_id to see which vehicle comes for repair most
  *     responses:
  *       200:
- *         description: Danh sách hãng xe hoặc xe sửa nhiều nhất (sắp xếp từ cao xuống thấp)
+ *         description: List of most repaired vehicle brands or vehicles (sorted from highest to lowest)
  */
 router.get(
   "/top-brands",
@@ -104,10 +104,10 @@ router.get(
  * @swagger
  * /api/dashboard/top-parts:
  *   get:
- *     summary: Danh sách phụ tùng thay nhiều nhất (sắp xếp từ cao xuống thấp)
+ *     summary: List of most replaced parts (sorted from highest to lowest)
  *     description: |
- *       - Không truyền gì: Lấy tất cả danh sách phụ tùng sắp xếp từ cao xuống thấp
- *       - Có filter: Lọc và sắp xếp từ cao xuống thấp
+ *       - No parameters: Get all parts sorted from highest to lowest
+ *       - With filter: Filter and sort from highest to lowest
  *     tags: [Dashboard]
  *     security:
  *       - bearerAuth: []
@@ -117,27 +117,27 @@ router.get(
  *         schema:
  *           type: string
  *           format: date
- *         description: Ngày bắt đầu (YYYY-MM-DD). Nếu không có thì lấy tất cả
+ *         description: Start date (YYYY-MM-DD). If not provided, get all
  *       - in: query
  *         name: date_to
  *         schema:
  *           type: string
  *           format: date
- *         description: Ngày kết thúc (YYYY-MM-DD). Nếu không có thì lấy tất cả
+ *         description: End date (YYYY-MM-DD). If not provided, get all
  *       - in: query
  *         name: center_id
  *         schema:
  *           type: string
- *         description: Lọc theo Service Center ID
+ *         description: Filter by Service Center ID
  *       - in: query
  *         name: status
  *         schema:
  *           type: string
  *           enum: [pending, accepted, completed, canceled]
- *         description: Lọc theo trạng thái checklist. Nếu không truyền thì lấy tất cả
+ *         description: Filter by checklist status. If not provided, get all
  *     responses:
  *       200:
- *         description: Danh sách phụ tùng thay nhiều nhất (sắp xếp từ cao xuống thấp)
+ *         description: List of most replaced parts (sorted from highest to lowest)
  */
 router.get(
   "/top-parts",
@@ -149,10 +149,10 @@ router.get(
  * @swagger
  * /api/dashboard/top-technicians-appointments:
  *   get:
- *     summary: Danh sách nhân viên có nhiều appointment nhất (sắp xếp từ cao xuống thấp)
+ *     summary: List of employees with most appointments (sorted from highest to lowest)
  *     description: |
- *       - Không truyền gì: Lấy tất cả danh sách nhân viên sắp xếp từ cao xuống thấp
- *       - Có filter: Lọc và sắp xếp từ cao xuống thấp
+ *       - No parameters: Get all employees sorted from highest to lowest
+ *       - With filter: Filter and sort from highest to lowest
  *     tags: [Dashboard]
  *     security:
  *       - bearerAuth: []
@@ -162,27 +162,27 @@ router.get(
  *         schema:
  *           type: string
  *           format: date
- *         description: Ngày bắt đầu (YYYY-MM-DD). Nếu không có thì lấy tất cả
+ *         description: Start date (YYYY-MM-DD). If not provided, get all
  *       - in: query
  *         name: date_to
  *         schema:
  *           type: string
  *           format: date
- *         description: Ngày kết thúc (YYYY-MM-DD). Nếu không có thì lấy tất cả
+ *         description: End date (YYYY-MM-DD). If not provided, get all
  *       - in: query
  *         name: center_id
  *         schema:
  *           type: string
- *         description: Lọc theo Service Center ID
+ *         description: Filter by Service Center ID
  *       - in: query
  *         name: status
  *         schema:
  *           type: string
  *           enum: [pending, assigned, check_in, in_progress, completed, canceled]
- *         description: Lọc theo trạng thái appointment. Nếu không truyền thì lấy tất cả
+ *         description: Filter by appointment status. If not provided, get all
  *     responses:
  *       200:
- *         description: Danh sách nhân viên có nhiều appointment nhất (sắp xếp từ cao xuống thấp)
+ *         description: List of employees with most appointments (sorted from highest to lowest)
  */
 router.get(
   "/top-technicians-appointments",
@@ -194,10 +194,10 @@ router.get(
  * @swagger
  * /api/dashboard/top-technicians-revenue:
  *   get:
- *     summary: Danh sách nhân viên kiếm nhiều tiền nhất (sắp xếp từ cao xuống thấp)
+ *     summary: List of employees earning most revenue (sorted from highest to lowest)
  *     description: |
- *       - Không truyền gì: Lấy tất cả danh sách nhân viên sắp xếp từ cao xuống thấp
- *       - Có filter: Lọc và sắp xếp từ cao xuống thấp
+ *       - No parameters: Get all employees sorted from highest to lowest
+ *       - With filter: Filter and sort from highest to lowest
  *     tags: [Dashboard]
  *     security:
  *       - bearerAuth: []
@@ -207,27 +207,27 @@ router.get(
  *         schema:
  *           type: string
  *           format: date
- *         description: Ngày bắt đầu (YYYY-MM-DD). Nếu không có thì lấy tất cả
+ *         description: Start date (YYYY-MM-DD). If not provided, get all
  *       - in: query
  *         name: date_to
  *         schema:
  *           type: string
  *           format: date
- *         description: Ngày kết thúc (YYYY-MM-DD). Nếu không có thì lấy tất cả
+ *         description: End date (YYYY-MM-DD). If not provided, get all
  *       - in: query
  *         name: center_id
  *         schema:
  *           type: string
- *         description: Lọc theo Service Center ID
+ *         description: Filter by Service Center ID
  *       - in: query
  *         name: status
  *         schema:
  *           type: string
  *           enum: [pending, assigned, check_in, in_progress, completed, canceled]
- *         description: Lọc theo trạng thái appointment. Nếu không truyền thì lấy tất cả
+ *         description: Filter by appointment status. If not provided, get all
  *     responses:
  *       200:
- *         description: Danh sách nhân viên kiếm nhiều tiền nhất (sắp xếp từ cao xuống thấp)
+ *         description: List of employees earning most revenue (sorted from highest to lowest)
  */
 router.get(
   "/top-technicians-revenue",

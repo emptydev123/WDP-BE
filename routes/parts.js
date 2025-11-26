@@ -14,14 +14,14 @@ const {
  * @swagger
  * tags:
  *   name: Parts
- *   description: API quản lý phụ tùng
+ *   description: API for managing parts
  */
 
 /**
  * @swagger
  * /api/parts:
  *   get:
- *     summary: Lấy danh sách parts
+ *     summary: Get list of parts
  *     tags: [Parts]
  *     security:
  *       - bearerAuth: []
@@ -42,7 +42,7 @@ const {
  *         name: search
  *         schema:
  *           type: string
- *         description: Tìm kiếm theo tên, số part hoặc mô tả
+ *         description: Search by name, part number or description
  *     responses:
  *       200:
  *         description: Success
@@ -75,7 +75,7 @@ router.get("/", auth.authMiddleWare, getAllParts);
  * @swagger
  * /api/parts/{partId}:
  *   get:
- *     summary: Lấy chi tiết part
+ *     summary: Get part details
  *     tags: [Parts]
  *     security:
  *       - bearerAuth: []
@@ -111,7 +111,7 @@ router.get("/:partId", auth.authMiddleWare, getPartById);
  * @swagger
  * /api/parts:
  *   post:
- *     summary: Tạo part mới
+ *     summary: Create new part
  *     tags: [Parts]
  *     security:
  *       - bearerAuth: []
@@ -161,7 +161,7 @@ router.post("/", auth.authMiddleWare, createPart);
  * @swagger
  * /api/parts/{partId}:
  *   put:
- *     summary: Cập nhật part
+ *     summary: Update part
  *     tags: [Parts]
  *     security:
  *       - bearerAuth: []
@@ -218,7 +218,7 @@ router.put("/:partId", auth.authMiddleWare, updatePart);
  * @swagger
  * /api/parts/{partId}:
  *   delete:
- *     summary: Xóa part
+ *     summary: Delete part
  *     tags: [Parts]
  *     security:
  *       - bearerAuth: []

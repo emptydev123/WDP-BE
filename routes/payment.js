@@ -7,14 +7,14 @@ const auth = require("../middlewares/auth");
  * @swagger
  * tags:
  *   name: Payments
- *   description: API quản lý thanh toán PayOS
+ *   description: API for managing PayOS payments
  */
 
 /**
  * @swagger
  * /api/payment/create:
  *   post:
- *     summary: Tạo link thanh toán PayOS
+ *     summary: Create PayOS payment link
  *     tags: [Payments]
  *     security:
  *       - bearerAuth: []
@@ -31,18 +31,18 @@ const auth = require("../middlewares/auth");
  *               amount:
  *                 type: number
  *                 example: 500000
- *                 description: Số tiền thanh toán (VND)
+ *                 description: Payment amount (VND)
  *               description:
  *                 type: string
- *                 example: "Bảo dưỡng xe điện"
- *                 description: Mô tả thanh toán (tối đa 25 ký tự)
+ *                 example: "Electric vehicle maintenance"
+ *                 description: Payment description (max 25 characters)
  *               timeoutSeconds:
  *                 type: number
  *                 example: 900
- *                 description: Thời gian timeout tính bằng giây (tùy chọn, mặc định 900 giây = 15 phút). Frontend truyền xuống để set timeout cho payment.
+ *                 description: Timeout duration in seconds (optional, default 900 seconds = 15 minutes). Frontend passes this to set payment timeout.
  *     responses:
  *       201:
- *         description: Tạo link thanh toán thành công
+ *         description: Payment link created successfully
  *         content:
  *           application/json:
  *             schema:
@@ -83,7 +83,7 @@ router.post(
  * @swagger
  * /api/payment/update-status:
  *   put:
- *     summary: Cập nhật trạng thái thanh toán
+ *     summary: Update payment status
  *     tags: [Payments]
  *     security:
  *       - bearerAuth: []
@@ -100,21 +100,21 @@ router.post(
  *               order_code:
  *                 type: number
  *                 example: 1703123456789
- *                 description: Mã đơn hàng
+ *                 description: Order code
  *               status:
  *                 type: string
  *                 enum: [pending, paid, cancelled, failed]
  *                 example: "paid"
- *                 description: Trạng thái thanh toán
+ *                 description: Payment status
  *     responses:
  *       200:
- *         description: Cập nhật trạng thái thành công
+ *         description: Payment status updated successfully
  *       400:
- *         description: Dữ liệu đầu vào không hợp lệ
+ *         description: Invalid input data
  *       401:
  *         description: Unauthorized
  *       500:
- *         description: Lỗi server
+ *         description: Server error
  */
 router.put(
   "/update-status",
@@ -127,7 +127,7 @@ router.put(
  * @swagger
  * /api/payment/transaction/{order_code}:
  *   get:
- *     summary: Lấy thông tin transaction thanh toán
+ *     summary: Get payment transaction information
  *     tags: [Payments]
  *     security:
  *       - bearerAuth: []
@@ -137,10 +137,10 @@ router.put(
  *         required: true
  *         schema:
  *           type: string
- *         description: Mã đơn hàng
+ *         description: Order code
  *     responses:
  *       200:
- *         description: Lấy thông tin transaction thành công
+ *         description: Successfully retrieved transaction information
  *         content:
  *           application/json:
  *             schema:
@@ -183,13 +183,13 @@ router.put(
  *                         role:
  *                           type: string
  *       400:
- *         description: Thiếu order_code
+ *         description: Missing order_code
  *       401:
  *         description: Unauthorized
  *       404:
- *         description: Không tìm thấy thanh toán
+ *         description: Payment not found
  *       500:
- *         description: Lỗi server
+ *         description: Server error
  */
 router.get(
   "/transaction/:order_code",
@@ -202,7 +202,7 @@ router.get(
  * @swagger
  * /api/payment/list:
  *   get:
- *     summary: Lấy danh sách thanh toán (mock data)
+ *     summary: Get list of payments (mock data)
  *     tags: [Payments]
  *     security:
  *       - bearerAuth: []
@@ -212,31 +212,31 @@ router.get(
  *         schema:
  *           type: integer
  *           default: 1
- *         description: Số trang
+ *         description: Page number
  *       - in: query
  *         name: limit
  *         schema:
  *           type: integer
  *           default: 10
- *         description: Số item per page
+ *         description: Items per page
  *       - in: query
  *         name: status
  *         schema:
  *           type: string
  *           enum: [pending, paid, cancelled, failed]
- *         description: Lọc theo trạng thái
+ *         description: Filter by status
  *       - in: query
  *         name: user_id
  *         schema:
  *           type: string
- *         description: Lọc theo user ID
+ *         description: Filter by user ID
  *     responses:
  *       200:
- *         description: Lấy danh sách thanh toán thành công
+ *         description: Successfully retrieved list of payments
  *       401:
  *         description: Unauthorized
  *       500:
- *         description: Lỗi server
+ *         description: Server error
  */
 router.get(
   "/list",
@@ -249,7 +249,7 @@ router.get(
  * @swagger
  * /api/payment/myTransactions:
  *   get:
- *     summary: Lấy danh sách transactions của user hiện tại đang đăng nhập
+ *     summary: Get list of transactions for currently logged in user
  *     tags: [Payments]
  *     security:
  *       - bearerAuth: []
@@ -380,7 +380,7 @@ router.get("/cancel", payment.paymentCancel);
  *         schema:
  *           type: number
  *           example: 900
- *         description: Thời gian timeout tính bằng giây (tùy chọn, mặc định 900 giây = 15 phút). Frontend truyền xuống để set timeout cho payment retry.
+ *         description: Timeout duration in seconds (optional, default 900 seconds = 15 minutes). Frontend passes this to set payment retry timeout.
  *     responses:
  *       201:
  *         description: Retry payment created successfully

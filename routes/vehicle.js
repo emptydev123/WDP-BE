@@ -1,20 +1,20 @@
-var vehicle = require('../controller/Vehiclecontroller');
-var express = require('express');
+var vehicle = require("../controller/Vehiclecontroller");
+var express = require("express");
 var router = express.Router();
-const auth = require('../middlewares/auth');
+const auth = require("../middlewares/auth");
 
 /**
  * @swagger
  * tags:
  *   name: Vehicles
- *   description: API quản lý xe và model xe điện
+ *   description: API for managing vehicles and electric vehicle models
  */
 
 /**
  * @swagger
  * /api/vehicle/createModel:
  *   post:
- *     summary: Tạo model xe điện mới
+ *     summary: Create new electric vehicle model
  *     tags: [Vehicles]
  *     security:
  *       - bearerAuth: []
@@ -50,46 +50,42 @@ const auth = require('../middlewares/auth');
  *                 example: 6
  *     responses:
  *       201:
- *         description: Tạo vehicle model thành công
+ *         description: Vehicle model created successfully
  *       401:
- *         description: Không có quyền truy cập
+ *         description: Unauthorized access
  *       500:
- *         description: Lỗi server
+ *         description: Server error
  */
 router.post(
-    "/createModel",
-    auth.authMiddleWare,
-    auth.requireRole('customer', 'admin', 'staff'),
-    vehicle.createVehicleModel
+  "/createModel",
+  auth.authMiddleWare,
+  auth.requireRole("customer", "admin", "staff"),
+  vehicle.createVehicleModel
 );
 
 /**
  * @swagger
  * /api/vehicle/get:
  *   get:
- *     summary: Lấy danh sách tất cả vehicle model
+ *     summary: Get list of all vehicle models
  *     tags: [Vehicles]
  *     security:
  *       - bearerAuth: []
  *     responses:
  *       200:
- *         description: Lấy danh sách model xe thành công
+ *         description: Successfully retrieved list of vehicle models
  *       401:
- *         description: Không có quyền truy cập
+ *         description: Unauthorized access
  *       500:
- *         description: Lỗi server
+ *         description: Server error
  */
-router.get(
-    "/get",
-    auth.authMiddleWare,
-    vehicle.getVehicleModels
-);
+router.get("/get", auth.authMiddleWare, vehicle.getVehicleModels);
 
 /**
  * @swagger
  * /api/vehicle/createVehicle:
  *   post:
- *     summary: Tạo xe mới cho người dùng
+ *     summary: Create new vehicle for user
  *     tags: [Vehicles]
  *     security:
  *       - bearerAuth: []
@@ -127,70 +123,70 @@ router.get(
  *                 example: "671f0dca3b0c4b8f12f1a911"
  *     responses:
  *       201:
- *         description: Tạo xe thành công
+ *         description: Vehicle created successfully
  *       401:
- *         description: Không có quyền truy cập
+ *         description: Unauthorized access
  *       500:
- *         description: Lỗi server
+ *         description: Server error
  */
 router.post(
-    '/createVehicle',
-    auth.authMiddleWare,
-    auth.requireRole('customer'),
-    vehicle.createVehicle
+  "/createVehicle",
+  auth.authMiddleWare,
+  auth.requireRole("customer"),
+  vehicle.createVehicle
 );
 
 /**
  * @swagger
  * /api/vehicle/getVehicleUser:
  *   get:
- *     summary: Lấy danh sách xe của người dùng hiện tại
+ *     summary: Get list of vehicles for current user
  *     tags: [Vehicles]
  *     security:
  *       - bearerAuth: []
  *     responses:
  *       200:
- *         description: Lấy danh sách xe thành công
+ *         description: Successfully retrieved list of vehicles
  *       404:
- *         description: Người dùng chưa có xe nào
+ *         description: User has no vehicles
  *       500:
- *         description: Lỗi server
+ *         description: Server error
  */
 router.get(
-    "/getVehicleUser",
-    auth.authMiddleWare,
-    auth.requireRole('customer'),
-    vehicle.getUserVehicle
+  "/getVehicleUser",
+  auth.authMiddleWare,
+  auth.requireRole("customer"),
+  vehicle.getUserVehicle
 );
 
 /**
  * @swagger
  * /api/vehicle/getAllVehicleUser:
  *   get:
- *     summary: Lấy danh sách tất cả xe của mọi người dùng
+ *     summary: Get list of all vehicles for all users
  *     tags: [Vehicles]
  *     security:
  *       - bearerAuth: []
  *     responses:
  *       200:
- *         description: Lấy danh sách tất cả xe thành công
+ *         description: Successfully retrieved list of all vehicles
  *       401:
- *         description: Không có quyền truy cập
+ *         description: Unauthorized access
  *       500:
- *         description: Lỗi server
+ *         description: Server error
  */
 router.get(
-    "/getAllVehicleUser",
-    auth.authMiddleWare,
-    auth.requireRole("admin", "staff"),
-    vehicle.getAllVehicle
+  "/getAllVehicleUser",
+  auth.authMiddleWare,
+  auth.requireRole("admin", "staff"),
+  vehicle.getAllVehicle
 );
 
 /**
  * @swagger
  * /api/vehicle/update/{id}:
  *   put:
- *     summary: Cập nhật thông tin xe của người dùng
+ *     summary: Update user vehicle information
  *     tags: [Vehicles]
  *     security:
  *       - bearerAuth: []
@@ -198,7 +194,7 @@ router.get(
  *       - name: id
  *         in: path
  *         required: true
- *         description: ID của xe cần cập nhật
+ *         description: ID of vehicle to update
  *         schema:
  *           type: string
  *           example: "671f0dca3b0c4b8f12f1a911"
@@ -227,26 +223,26 @@ router.get(
  *                 example: "2024-10-01"
  *     responses:
  *       200:
- *         description: Cập nhật xe thành công
+ *         description: Vehicle updated successfully
  *       400:
- *         description: Xe đang có lịch hẹn hoạt động, không thể cập nhật
+ *         description: Vehicle has active appointments, cannot update
  *       404:
- *         description: Xe không tồn tại hoặc không thuộc về user này
+ *         description: Vehicle does not exist or does not belong to this user
  *       500:
- *         description: Lỗi server
+ *         description: Server error
  */
 router.put(
-    '/update/:id',
-    auth.authMiddleWare,
-    auth.requireRole("admin", "staff", "customer"),
-    vehicle.updateVehicle
+  "/update/:id",
+  auth.authMiddleWare,
+  auth.requireRole("admin", "staff", "customer"),
+  vehicle.updateVehicle
 );
 
 /**
  * @swagger
  * /api/vehicle/delete/{id}:
  *   delete:
- *     summary: Xóa xe của người dùng
+ *     summary: Delete user vehicle
  *     tags: [Vehicles]
  *     security:
  *       - bearerAuth: []
@@ -269,9 +265,9 @@ router.put(
  *         description: Lỗi server
  */
 router.delete(
-    '/delete/:id',
-    auth.authMiddleWare,
-    auth.requireRole("admin", "customer", "staff"),
-    vehicle.deleteVehicle
+  "/delete/:id",
+  auth.authMiddleWare,
+  auth.requireRole("admin", "customer", "staff"),
+  vehicle.deleteVehicle
 );
 module.exports = router;

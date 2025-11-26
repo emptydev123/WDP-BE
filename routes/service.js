@@ -7,14 +7,14 @@ const auth = require("../middlewares/auth");
  * @swagger
  * tags:
  *   name: Services
- *   description: API quản lý dịch vụ bảo dưỡng xe điện
+ *   description: API for managing electric vehicle maintenance services
  */
 
 /**
  * @swagger
  * /api/service/create:
  *   post:
- *     summary: Tạo dịch vụ mới
+ *     summary: Create new service
  *     tags: [Services]
  *     security:
  *       - bearerAuth: []
@@ -30,10 +30,10 @@ const auth = require("../middlewares/auth");
  *             properties:
  *               service_name:
  *                 type: string
- *                 example: "Thay pin xe điện"
+ *                 example: "Electric vehicle battery replacement"
  *               description:
  *                 type: string
- *                 example: "Dịch vụ thay pin xe điện dung lượng cao"
+ *                 example: "High-capacity electric vehicle battery replacement service"
  *               base_price:
  *                 type: number
  *                 example: 5000000
@@ -45,11 +45,11 @@ const auth = require("../middlewares/auth");
  *                 example: "2"
  *     responses:
  *       201:
- *         description: Tạo dịch vụ thành công
+ *         description: Service created successfully
  *       401:
- *         description: Không có quyền truy cập
+ *         description: Unauthorized access
  *       500:
- *         description: Lỗi server
+ *         description: Server error
  */
 router.post(
   "/create",
@@ -62,17 +62,17 @@ router.post(
  * @swagger
  * /api/service/get:
  *   get:
- *     summary: Lấy danh sách dịch vụ đang hoạt động
+ *     summary: Get list of active services
  *     tags: [Services]
  *     security:
  *       - bearerAuth: []
  *     responses:
  *       202:
- *         description: Lấy danh sách dịch vụ thành công
+ *         description: Successfully retrieved list of services
  *       401:
- *         description: Không có quyền truy cập
+ *         description: Unauthorized access
  *       500:
- *         description: Lỗi server
+ *         description: Server error
  */
 router.get(
   "/get",
@@ -84,7 +84,7 @@ router.get(
  * @swagger
  * /api/service/update/{id}:
  *   put:
- *     summary: Cập nhật thông tin dịch vụ
+ *     summary: Update service information
  *     tags: [Services]
  *     security:
  *       - bearerAuth: []
@@ -94,7 +94,7 @@ router.get(
  *         required: true
  *         schema:
  *           type: string
- *         description: ID của dịch vụ cần cập nhật
+ *         description: ID of the service to update
  *     requestBody:
  *       required: true
  *       content:
@@ -104,10 +104,10 @@ router.get(
  *             properties:
  *               service_name:
  *                 type: string
- *                 example: "Rửa xe cao cấp"
+ *                 example: "Premium car wash"
  *               description:
  *                 type: string
- *                 example: "Rửa xe bằng hơi nước và chăm sóc nội thất"
+ *                 example: "Steam car wash and interior care"
  *               base_price:
  *                 type: number
  *                 example: 300000
@@ -119,11 +119,11 @@ router.get(
  *                 example: "1.5"
  *     responses:
  *       200:
- *         description: Cập nhật thành công
+ *         description: Update successful
  *       404:
- *         description: Không tìm thấy dịch vụ
+ *         description: Service not found
  *       500:
- *         description: Lỗi server
+ *         description: Server error
  */
 
 router.put(
@@ -136,7 +136,7 @@ router.put(
  * @swagger
  * /api/service/delete/{id}:
  *   delete:
- *     summary: Xóa dịch vụ
+ *     summary: Delete service
  *     tags: [Services]
  *     security:
  *       - bearerAuth: []
@@ -146,14 +146,14 @@ router.put(
  *         required: true
  *         schema:
  *           type: string
- *         description: ID của dịch vụ cần xóa
+ *         description: ID of the service to delete
  *     responses:
  *       200:
- *         description: Xóa thành công
+ *         description: Delete successful
  *       404:
- *         description: Không tìm thấy dịch vụ
+ *         description: Service not found
  *       500:
- *         description: Lỗi server
+ *         description: Server error
  */
 router.delete(
   "/delete/:id",

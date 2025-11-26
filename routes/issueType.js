@@ -8,14 +8,14 @@ const { authMiddleWare } = require("../middlewares/auth");
  * @swagger
  * tags:
  *   name: IssueTypes
- *   description: API quản lý loại vấn đề (Issue Types)
+ *   description: API for managing issue types
  */
 
 /**
  * @swagger
  * /api/issue-types:
  *   get:
- *     summary: Lấy danh sách issue types
+ *     summary: Get list of issue types
  *     tags: [IssueTypes]
  *     security:
  *       - bearerAuth: []
@@ -37,13 +37,13 @@ const { authMiddleWare } = require("../middlewares/auth");
  *         schema:
  *           type: string
  *           enum: [battery, motor, charging, brake, cooling, electrical, software, mechanical, suspension, tire, other]
- *         description: Lọc theo category
+ *         description: Filter by category
  *       - in: query
  *         name: severity
  *         schema:
  *           type: string
  *           enum: [minor, moderate, major, critical]
- *         description: Lọc theo severity
+ *         description: Filter by severity
  *     responses:
  *       200:
  *         description: Success
@@ -56,7 +56,7 @@ router.get("/", authMiddleWare, IssueTypeController.getAllIssueTypes);
  * @swagger
  * /api/issue-types/{issueTypeId}:
  *   get:
- *     summary: Lấy chi tiết issue type
+ *     summary: Get issue type details
  *     tags: [IssueTypes]
  *     security:
  *       - bearerAuth: []
@@ -83,7 +83,7 @@ router.get(
  * @swagger
  * /api/issue-types:
  *   post:
- *     summary: Tạo issue type mới (Admin/Staff)
+ *     summary: Create new issue type (Admin/Staff)
  *     tags: [IssueTypes]
  *     security:
  *       - bearerAuth: []
@@ -115,7 +115,7 @@ router.post("/", authMiddleWare, IssueTypeController.createIssueType);
  * @swagger
  * /api/issue-types/{issueTypeId}:
  *   put:
- *     summary: Cập nhật issue type (Admin/Staff)
+ *     summary: Update issue type (Admin/Staff)
  *     tags: [IssueTypes]
  *     security:
  *       - bearerAuth: []
@@ -154,7 +154,7 @@ router.put(
  * @swagger
  * /api/issue-types/{issueTypeId}:
  *   delete:
- *     summary: Xóa issue type (Admin)
+ *     summary: Delete issue type (Admin)
  *     tags: [IssueTypes]
  *     security:
  *       - bearerAuth: []

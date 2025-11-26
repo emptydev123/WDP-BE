@@ -14,7 +14,7 @@ const {
  * @swagger
  * /api/inventory:
  *   get:
- *     summary: Lấy danh sách inventory
+ *     summary: Get list of inventory
  *     tags: [Inventory]
  *     security:
  *       - bearerAuth: []
@@ -85,7 +85,7 @@ router.get("/", auth.authMiddleWare, getAllInventory);
  * @swagger
  * /api/inventory/{inventoryId}:
  *   get:
- *     summary: Lấy chi tiết inventory
+ *     summary: Get inventory details
  *     tags: [Inventory]
  *     security:
  *       - bearerAuth: []
@@ -121,7 +121,7 @@ router.get("/:inventoryId", auth.authMiddleWare, getInventoryById);
  * @swagger
  * /api/inventory:
  *   post:
- *     summary: Tạo inventory mới
+ *     summary: Create new inventory
  *     tags: [Inventory]
  *     security:
  *       - bearerAuth: []
@@ -175,7 +175,7 @@ router.post("/", auth.authMiddleWare, createInventory);
  * @swagger
  * /api/inventory/{inventoryId}:
  *   put:
- *     summary: Cập nhật inventory
+ *     summary: Update inventory
  *     tags: [Inventory]
  *     security:
  *       - bearerAuth: []
@@ -195,14 +195,14 @@ router.post("/", auth.authMiddleWare, createInventory);
  *             properties:
  *               quantity_avaiable:
  *                 type: number
- *                 description: Số lượng tồn kho
+ *                 description: Available quantity
  *               minimum_stock:
  *                 type: number
- *                 description: Số lượng tồn kho tối thiểu
+ *                 description: Minimum stock quantity
  *               last_restocked:
  *                 type: string
  *                 format: date
- *                 description: Ngày nhập kho
+ *                 description: Restock date
  *     responses:
  *       200:
  *         description: Inventory updated successfully
@@ -230,7 +230,7 @@ router.put("/:inventoryId", auth.authMiddleWare, updateInventory);
  * @swagger
  * /api/inventory/{inventoryId}:
  *   delete:
- *     summary: Xóa inventory
+ *     summary: Delete inventory
  *     tags: [Inventory]
  *     security:
  *       - bearerAuth: []
