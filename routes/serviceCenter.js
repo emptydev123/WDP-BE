@@ -30,7 +30,6 @@ const auth = require("../middlewares/auth");
  *               - address
  *               - phone
  *               - user_id
- *               - email
  *             properties:
  *               center_name:
  *                 type: string
@@ -41,6 +40,9 @@ const auth = require("../middlewares/auth");
  *               phone:
  *                 type: string
  *                 example: "0987654321"
+ *               user_id:
+ *                 type: string
+ *                 description: Staff user id assigned to this center
  *               email:
  *                 type: string
  *                 example: "evcenter@gmail.com"
@@ -52,43 +54,15 @@ const auth = require("../middlewares/auth");
  *         description: Service Center created successfully
  *       400:
  *         description: Invalid data
- *       401:
- *         description: Unauthorized access
  *       500:
  *         description: Server error
  */
 router.post(
   "/create",
   auth.authMiddleWare,
-  auth.requireRole("admin", "staff", "customer"),
+  auth.requireRole("admin", "staff"),
   serviceCenter.createServiceCenter
 );
-
-/**
- * @swagger
- * /api/service-center/technicians:
- *   get:
- *     summary: Get list of technicians (can filter by center_id)
- *     tags: [Service Center]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: query
- *         name: center_id
- *         required: false
- *         schema:
- *           type: string
- *         description: Service Center ID to filter technicians
- *     responses:
- *       200:
- *         description: Successfully retrieved list of technicians
- *       401:
- *         description: Unauthorized access
- *       404:
- *         description: Service center not found (when invalid center_id is provided)
- *       500:
- *         description: Server error
- */
 router.get(
   "/technicians",
   auth.authMiddleWare,
@@ -405,7 +379,7 @@ router.delete(
  * @swagger
  * /api/service-center/technican/add:
  *   post:
- *     summary: Add employee to service center
+ *     summary: Add employee (technician) to service center
  *     tags: [Service Center]
  *     security:
  *       - bearerAuth: []
@@ -421,30 +395,11 @@ router.delete(
  *             properties:
  *               user_id:
  *                 type: string
- *                 description: User ID (employee)
- *                 example: "60d5f84e5b7c6d001f8184d2"
  *               center_id:
  *                 type: string
- *                 description: Service center ID
- *                 example: "60d5f84e5b7c6d001f8184d3"
- *               maxSlotsPerDay:
- *                 type: number
- *                 description: Maximum slots each employee can work per day (default is 4)
- *                 example: 4
- *               status:
- *                 type: string
- *                 enum: ["on", "off"]
- *                 description: Employee work status
- *                 example: "on"
  *     responses:
  *       201:
- *         description: Employee added to service center successfully
- *       400:
- *         description: Invalid data
- *       404:
- *         description: Service center or employee not found
- *       500:
- *         description: Server error
+ *         description: Technician added to service center successfully
  */
 router.post(
   "/technican/add",
@@ -457,7 +412,7 @@ router.post(
  * @swagger
  * /api/service-center/technican/remove:
  *   post:
- *     summary: Remove employee from service center
+ *     summary: Remove technician from service center
  *     tags: [Service Center]
  *     security:
  *       - bearerAuth: []
@@ -473,26 +428,18 @@ router.post(
  *             properties:
  *               user_id:
  *                 type: string
- *                 description: User ID (employee)
- *                 example: "60d5f84e5b7c6d001f8184d2"
  *               center_id:
  *                 type: string
- *                 description: Service center ID
- *                 example: "60d5f84e5b7c6d001f8184d3"
  *     responses:
  *       200:
- *         description: Employee removed from service center successfully
- *       400:
- *         description: Invalid data
+ *         description: Technician removed successfully
  *       404:
- *         description: Service center or employee not found
- *       500:
- *         description: Server error
+ *         description: Technician not found in this center
  */
 router.post(
   "/technican/remove",
   auth.authMiddleWare,
-  auth.requireRole("admin", "technician", "staff", "customer"),
+  auth.requireRole("admin", "technician", "staff"),
   serviceCenter.removeTechnicanFromCenter
 );
 module.exports = router;

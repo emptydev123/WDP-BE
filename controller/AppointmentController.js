@@ -57,6 +57,23 @@ exports.getAppointments = async (req, res) => {
 
     const query = {};
 
+    // Restrict staff: find service center where this user is assigned (single staff per center)
+    try {
+      const requester = await User.findById(userId).select('role');
+      if (requester && requester.role === 'staff') {
+        const staffCenter = await ServiceCenter.findOne({ user_id: requester._id }).select('_id');
+        if (!staffCenter) {
+          return res.status(403).json({
+            message: 'Staff chưa được gán vào trung tâm nào',
+            success: false,
+          });
+        }
+        query.center_id = staffCenter._id.toString();
+      }
+    } catch (e) {
+      console.error('getAppointments staff center lookup error:', e?.message || e);
+    }
+
     if (status) {
       // Validate status theo enum trong model
       const validStatuses = [
@@ -207,6 +224,24 @@ exports.getTechnicianSchedule = async (req, res) => {
       });
     }
 
+    // Nếu requester là staff, lấy trung tâm theo ServiceCenter.user_id (mỗi staff 1 trung tâm)
+    let effectiveCenterId = center_id;
+    try {
+      const requester = await User.findById(userId).select('role');
+      if (requester && requester.role === 'staff') {
+        const staffCenter = await ServiceCenter.findOne({ user_id: requester._id }).select('_id');
+        if (!staffCenter) {
+          return res.status(403).json({
+            message: 'Staff chưa được gán vào trung tâm nào',
+            success: false,
+          });
+        }
+        effectiveCenterId = staffCenter._id.toString();
+      }
+    } catch (e) {
+      console.error('getTechnicianSchedule staff center lookup error:', e?.message || e);
+    }
+
     // Kiểm tra tham số bắt buộc
     if (!date_from || !date_to) {
       return res.status(400).json({
@@ -250,8 +285,8 @@ exports.getTechnicianSchedule = async (req, res) => {
         },
       };
 
-      if (center_id) {
-        appointmentQuery.center_id = center_id;
+      if (effectiveCenterId) {
+        appointmentQuery.center_id = effectiveCenterId;
       }
 
       const schedules = await Appointment.find(appointmentQuery)
@@ -320,8 +355,8 @@ exports.getTechnicianSchedule = async (req, res) => {
           },
         };
 
-        if (center_id) {
-          appointmentQuery.center_id = center_id;
+        if (effectiveCenterId) {
+          appointmentQuery.center_id = effectiveCenterId;
         }
 
         const schedules = await Appointment.find(appointmentQuery)

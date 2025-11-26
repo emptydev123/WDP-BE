@@ -61,8 +61,8 @@ exports.updateServiceCenter = async (req, res) => {
             });
         }
 
-        // Danh sách field được phép update
-        const allowedFields = ["center_name", "address", "phone", "email", "is_active"];
+        // Danh sách field được phép update (cho phép đổi staff khi chưa có lịch hẹn)
+        const allowedFields = ["center_name", "address", "phone", "email", "is_active", "user_id"];
 
         // Cập nhật chỉ các field hợp lệ
         for (const key of Object.keys(updates)) {
@@ -198,3 +198,5 @@ exports.removeTechnicanFromCenter = async (req, res) => {
         res.status(500).json({ message: error.message });
     }
 };
+
+// Staff is represented by single user_id on ServiceCenter (one staff per center)
