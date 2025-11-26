@@ -192,6 +192,7 @@ exports.getTechnicianSchedule = async (req, res) => {
   try {
     const {
       technician_id,
+      center_id,
       date_from,
       date_to,
       page = 1,
@@ -237,7 +238,8 @@ exports.getTechnicianSchedule = async (req, res) => {
         });
       }
 
-      const schedules = await Appointment.find({
+      // Build query với filter center_id nếu có
+      const appointmentQuery = {
         technician_id: technician_id,
         appoinment_date: {
           $gte: fromDate,
@@ -246,7 +248,13 @@ exports.getTechnicianSchedule = async (req, res) => {
         status: {
           $in: ["assigned", "check_in", "in_progress", "completed"],
         },
-      })
+      };
+
+      if (center_id) {
+        appointmentQuery.center_id = center_id;
+      }
+
+      const schedules = await Appointment.find(appointmentQuery)
         .populate("user_id", "fullName phoneNumber")
         .populate("vehicle_id", "license_plate brand model")
         .populate("center_id", "center_name address")
@@ -300,7 +308,8 @@ exports.getTechnicianSchedule = async (req, res) => {
     // Lấy lịch làm việc cho từng technician
     const techniciansWithSchedules = await Promise.all(
       technicians.map(async (technician) => {
-        const schedules = await Appointment.find({
+        // Build query với filter center_id nếu có
+        const appointmentQuery = {
           technician_id: technician._id,
           appoinment_date: {
             $gte: fromDate,
@@ -309,7 +318,13 @@ exports.getTechnicianSchedule = async (req, res) => {
           status: {
             $in: ["assigned", "check_in", "in_progress", "completed"],
           },
-        })
+        };
+
+        if (center_id) {
+          appointmentQuery.center_id = center_id;
+        }
+
+        const schedules = await Appointment.find(appointmentQuery)
           .populate("user_id", "fullName phoneNumber")
           .populate("vehicle_id", "license_plate brand model")
           .populate("center_id", "center_name address")

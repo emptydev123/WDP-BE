@@ -338,6 +338,12 @@ router.post(
  *           type: string
  *         description: Technician ID (if not provided, get all technicians)
  *       - in: query
+ *         name: center_id
+ *         required: false
+ *         schema:
+ *           type: string
+ *         description: Service Center ID to filter appointments by center (optional, if not provided, get appointments from all centers)
+ *       - in: query
  *         name: date_from
  *         required: true
  *         schema:
