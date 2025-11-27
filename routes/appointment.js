@@ -79,6 +79,11 @@ const auth = require("../middlewares/auth");
  *           format: date
  *         example: "2024-01-31"
  *         description: Filter to date (YYYY-MM-DD)
+ *       - in: query
+ *         name: partId
+ *         schema:
+ *           type: string
+ *         description: Filter by part ID (returns appointments with checklists containing this part)
  *     responses:
  *       200:
  *         description: Successfully retrieved list of appointments
