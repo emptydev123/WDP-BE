@@ -1,3 +1,4 @@
+const mongoose = require("mongoose");
 const Appointment = require("../model/appointment");
 const User = require("../model/user");
 const ServiceCenter = require("../model/serviceCenter");
@@ -5,6 +6,7 @@ const Vehicle = require("../model/vehicle");
 const Payment = require("../model/payment");
 const PaymentController = require("./PaymentController");
 const ServiceType = require("../model/serviceType");
+const Checklist = require("../model/checklist");
 const {
   createPagination,
   createPaginatedResponse,
@@ -40,6 +42,7 @@ exports.getAppointments = async (req, res) => {
       date,
       date_from,
       date_to,
+      partId,
     } = req.query;
     const userId = req._id?.toString();
 
@@ -144,6 +147,37 @@ exports.getAppointments = async (req, res) => {
         const toDate = new Date(date_to);
         toDate.setHours(23, 59, 59, 999);
         query.appoinment_date.$lte = toDate;
+      }
+    }
+
+    // Lọc theo partId - tìm appointments có checklist chứa part này
+    if (partId) {
+      try {
+        const validPartId = mongoose.Types.ObjectId.isValid(partId)
+          ? new mongoose.Types.ObjectId(partId)
+          : partId;
+
+        // Tìm các checklist có chứa partId này
+        const checklistsWithPart = await Checklist.find({
+          "parts.part_id": validPartId,
+        }).select("appointment_id");
+
+        if (checklistsWithPart.length === 0) {
+          // Không có checklist nào chứa part này, trả về empty
+          query._id = { $in: [] };
+        } else {
+          // Lấy danh sách appointment_id từ các checklist
+          const appointmentIds = checklistsWithPart.map(
+            (c) => c.appointment_id
+          );
+          // Filter appointments theo danh sách appointment_id
+          query._id = { $in: appointmentIds };
+        }
+      } catch (error) {
+        return res.status(400).json({
+          message: "partId không hợp lệ",
+          success: false,
+        });
       }
     }
 

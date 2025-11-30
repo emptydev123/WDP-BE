@@ -1,4 +1,5 @@
 // controller/ChecklistController.js
+const mongoose = require("mongoose");
 const Checklist = require("../model/checklist");
 const IssueType = require("../model/issueType");
 const Appointment = require("../model/appointment");
@@ -20,6 +21,7 @@ exports.getAllChecklists = async (req, res) => {
       technicianId,
       date_from,
       date_to,
+      partId,
     } = req.query;
     const userId = req._id?.toString();
 
@@ -79,6 +81,20 @@ exports.getAllChecklists = async (req, res) => {
     } else if (appointment_id) {
       // Chỉ có appointment_id, không có technicianId
       filter.appointment_id = appointment_id;
+    }
+
+    // Lọc theo partId - tìm checklist có chứa part này trong mảng parts
+    if (partId) {
+      try {
+        filter["parts.part_id"] = mongoose.Types.ObjectId.isValid(partId)
+          ? new mongoose.Types.ObjectId(partId)
+          : partId;
+      } catch (error) {
+        return res.status(400).json({
+          message: "partId không hợp lệ",
+          success: false,
+        });
+      }
     }
 
     const total = await Checklist.countDocuments(filter);

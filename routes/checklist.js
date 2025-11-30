@@ -52,6 +52,11 @@ const { authMiddleWare } = require("../middlewares/auth");
  *           type: string
  *           format: date
  *         description: Filter to date (YYYY-MM-DD)
+ *       - in: query
+ *         name: partId
+ *         schema:
+ *           type: string
+ *         description: Filter by part ID (returns checklists containing this part)
  *     responses:
  *       200:
  *         description: Success
