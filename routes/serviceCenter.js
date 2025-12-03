@@ -442,4 +442,12 @@ router.post(
   auth.requireRole("admin", "technician", "staff"),
   serviceCenter.removeTechnicanFromCenter
 );
+
+// Lấy danh sách trung tâm gần nhất theo vị trí người dùng
+router.get(
+  "/near",
+  auth.authMiddleWare,
+  auth.requireRole("customer", "staff", "technician", "admin"),
+  serviceCenter.getNearestCenters
+);
 module.exports = router;

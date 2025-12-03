@@ -11,6 +11,12 @@ const serviceCenterSchema = new schema(
     address: {
       type: String,
     },
+    lat: {
+      type: Number,
+    },
+    lng: {
+      type: Number,
+    },
     user_id: {
       type: mongoose.Types.ObjectId,
       ref: "User",
@@ -21,6 +27,18 @@ const serviceCenterSchema = new schema(
     is_active: {
       type: Boolean,
       default: true,
+    },
+    working_hours: {
+      type: Object,
+      default: {
+        monday: { open: '08:00', close: '17:00' },
+        tuesday: { open: '08:00', close: '17:00' },
+        wednesday: { open: '08:00', close: '17:00' },
+        thursday: { open: '08:00', close: '17:00' },
+        friday: { open: '08:00', close: '17:00' },
+        saturday: { open: '08:00', close: '12:00' },
+        sunday: { open: null, close: null }
+      }
     },
     // maxSlotsPerDay: {  // Max slots được phục vụ trong 1 ngày
     //   type: Number,

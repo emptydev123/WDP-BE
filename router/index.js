@@ -14,6 +14,8 @@ const notificationRouter = require("../routes/notification");
 const checklistRouter = require("../routes/checklist");
 const dashboardRouter = require("../routes/dashboard");
 const PaymentController = require("../controller/PaymentController");
+const aiRouter = require("../routes/ai");
+const geoRouter = require("../routes/geo");
 
 const chatRouter = require("../routes/chat");
 
@@ -33,7 +35,9 @@ router.use("/issue-types", issueTypeRouter);
 router.use("/notifications", notificationRouter);
 router.use("/checklist", checklistRouter);
 router.use("/dashboard", dashboardRouter);
+router.use("/geo", geoRouter);
 
 router.use("/chat", chatRouter);
+router.use("/ai", aiRouter);
 
 module.exports = router;

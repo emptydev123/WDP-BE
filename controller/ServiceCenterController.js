@@ -7,9 +7,20 @@ const { createServiceCenterHours } = require('./ServiceCenterHoursController')
 const mongoose = require('mongoose');
 const { updateSlotsForServiceCenter, getDayOfWeek, checkAndUpdateSlotsForNextWeek } = require('../utils/logicSlots')
 
+// Haversine distance in KM between two lat/lng points
+function haversineKm(aLat, aLng, bLat, bLng) {
+    const R = 6371; // Earth radius km
+    const dLat = (bLat - aLat) * Math.PI / 180;
+    const dLng = (bLng - aLng) * Math.PI / 180;
+    const lat1 = aLat * Math.PI / 180;
+    const lat2 = bLat * Math.PI / 180;
+    const h = Math.sin(dLat / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) ** 2;
+    return R * 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
+}
+
 exports.createServiceCenter = async (req, res) => {
     try {
-        const { center_name, address, phone, user_id, email } = req.body;
+        const { center_name, address, phone, user_id, email, lat, lng } = req.body;
 
         // Kiểm tra nếu trung tâm dịch vụ đã tồn tại
         const existingCenter = await ServiceCenter.findOne({ center_name });
@@ -24,6 +35,8 @@ exports.createServiceCenter = async (req, res) => {
             user_id,
             phone,
             email,
+            lat: typeof lat === 'number' ? lat : undefined,
+            lng: typeof lng === 'number' ? lng : undefined,
         });
 
         // Lưu trung tâm dịch vụ
@@ -62,7 +75,7 @@ exports.updateServiceCenter = async (req, res) => {
         }
 
         // Danh sách field được phép update (cho phép đổi staff khi chưa có lịch hẹn)
-        const allowedFields = ["center_name", "address", "phone", "email", "is_active", "user_id"];
+        const allowedFields = ["center_name", "address", "phone", "email", "is_active", "user_id", "lat", "lng"];
 
         // Cập nhật chỉ các field hợp lệ
         for (const key of Object.keys(updates)) {
@@ -200,3 +213,53 @@ exports.removeTechnicanFromCenter = async (req, res) => {
 };
 
 // Staff is represented by single user_id on ServiceCenter (one staff per center)
+
+// GET /api/service-center/near?lat=..&lng=..&radius=20
+exports.getNearestCenters = async (req, res) => {
+    try {
+        console.log('[getNearestCenters] Query params:', req.query);
+        const { lat, lng, radius = 20 } = req.query;
+        if (lat === undefined || lng === undefined) {
+            return res.status(400).json({ success: false, message: "lat và lng là bắt buộc" });
+        }
+        const baseLat = parseFloat(lat);
+        const baseLng = parseFloat(lng);
+        const radiusKm = parseFloat(radius);
+        console.log('[getNearestCenters] Parsed:', { baseLat, baseLng, radiusKm });
+        if (Number.isNaN(baseLat) || Number.isNaN(baseLng) || Number.isNaN(radiusKm)) {
+            return res.status(400).json({ success: false, message: "lat/lng/radius không hợp lệ" });
+        }
+
+        // Approximate km to degrees
+        // Latitude: ~111km per degree (constant)
+        // Longitude: ~111km * cos(latitude) per degree (varies by latitude)
+        const latDeg = radiusKm / 111;
+        const lngDeg = radiusKm / (111 * Math.cos(baseLat * Math.PI / 180));
+        console.log('[getNearestCenters] Bounding box deg:', { latDeg, lngDeg });
+        const query = {
+            is_active: true,
+            lat: { $exists: true, $ne: null, $gte: baseLat - latDeg, $lte: baseLat + latDeg },
+            lng: { $exists: true, $ne: null, $gte: baseLng - lngDeg, $lte: baseLng + lngDeg },
+        };
+        console.log('[getNearestCenters] Query filter:', JSON.stringify(query, null, 2));
+        const candidates = await ServiceCenter.find(query);
+        console.log('[getNearestCenters] Candidates found:', candidates.length);
+
+        const enriched = candidates.map(c => {
+            const obj = c.toObject();
+            obj.distanceKm = haversineKm(baseLat, baseLng, obj.lat, obj.lng);
+            return obj;
+        }).sort((a,b) => a.distanceKm - b.distanceKm);
+        
+        console.log('[getNearestCenters] Enriched with distances:', enriched.map(e => ({ name: e.center_name, dist: e.distanceKm })));
+
+        return res.status(200).json({
+            success: true,
+            message: "Lấy danh sách trung tâm gần nhất thành công",
+            data: enriched,
+        });
+    } catch (err) {
+        console.error("getNearestCenters error", err);
+        return res.status(500).json({ success: false, message: "Lỗi server khi lấy trung tâm gần nhất" });
+    }
+};
